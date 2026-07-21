@@ -138,10 +138,18 @@ export function App() {
     }
   }, [role, screen]);
 
+  // onEvent changes identity whenever role/screen change. The socket must not:
+  // depending on it here tore down a live connection on every screen change,
+  // and the resume it triggered changed the screen again — a reconnect loop.
+  const onEventRef = useRef(onEvent);
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  });
+
   useEffect(() => {
     const handle = connectWs({
       onStatus: setStatus,
-      onEvent,
+      onEvent: (event) => onEventRef.current(event),
       onOpen: () => {
         // Auto session:resume on every (re)connect with backoff
         const session = loadSession();
@@ -153,7 +161,7 @@ export function App() {
     });
     wsRef.current = handle;
     return () => handle.close();
-  }, [onEvent]);
+  }, []);
 
   const send = (event: Parameters<WsHandle['send']>[0]) => {
     setError('');

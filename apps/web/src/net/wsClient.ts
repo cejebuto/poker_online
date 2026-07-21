@@ -62,11 +62,12 @@ export function connectWs(handlers: WsClientHandlers): WsHandle {
     });
 
     socket.addEventListener('close', () => {
+      // An intentional teardown is not a dropped connection — reporting it
+      // would flash "disconnected" on the way out.
+      if (closedByUser) return;
       handlers.onStatus('disconnected');
-      if (!closedByUser) {
-        timer = setTimeout(connect, retryMs);
-        retryMs = Math.min(retryMs * 2, 8000);
-      }
+      timer = setTimeout(connect, retryMs);
+      retryMs = Math.min(retryMs * 2, 8000);
     });
 
     socket.addEventListener('error', () => {
