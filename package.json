@@ -1,0 +1,29 @@
+{
+  "name": "poker",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.5.2",
+  "scripts": {
+    "build": "pnpm -r --filter @poker/shared --filter @poker/engine --filter @poker/api --filter @poker/web build",
+    "dev": "pnpm -r --parallel --filter @poker/api --filter @poker/web dev",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
+    "test": "pnpm -r --filter @poker/engine --filter @poker/shared --filter @poker/api --filter @poker/web test",
+    "typecheck": "pnpm -r --filter @poker/shared --filter @poker/engine --filter @poker/api --filter @poker/web typecheck"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.32.1",
+    "@typescript-eslint/parser": "^8.32.1",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-import-resolver-typescript": "^4.3.4",
+    "eslint-plugin-boundaries": "^5.0.1",
+    "eslint-plugin-import": "^2.31.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,16 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Placeholder model so Prisma can generate a client and run an initial migration.
+/// Real event-store models land in later phases.
+model SchemaMeta {
+  id        Int      @id @default(1)
+  version   String   @default("0.1.0")
+  updatedAt DateTime @updatedAt
+}

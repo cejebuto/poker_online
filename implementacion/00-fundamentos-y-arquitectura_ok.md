@@ -1,5 +1,7 @@
 # Fundamentos y Arquitectura
 
+**Estado:** implementado (scaffold monorepo). Temas SVG UI → fase 4.
+
 Base común para todas las fases: estructura del repositorio, convenciones de código limpio y escalable, el sistema de temas de cartas, y los criterios transversales (seguridad media, dockerización).
 
 ---
@@ -54,17 +56,17 @@ poker/
 
 **Tareas**
 
-- [ ] `[INFRA]` Inicializar monorepo con pnpm workspaces y `tsconfig.base.json` estricto. `S`
-- [ ] `[INFRA]` Configurar ESLint + Prettier + `tsc --noEmit` en la raíz. `S`
-- [ ] `[ENG]` Crear paquete `engine` vacío con su `package.json` y build. `S`
-- [ ] `[BE]` Crear paquete `shared` con tipos base (`Card`, `Suit`, `Rank`, DTOs). `S`
+- [x] `[INFRA]` Inicializar monorepo con pnpm workspaces y `tsconfig.base.json` estricto. `S`
+- [x] `[INFRA]` Configurar ESLint + Prettier + `tsc --noEmit` en la raíz. `S`
+- [x] `[ENG]` Crear paquete `engine` vacío con su `package.json` y build. `S`
+- [x] `[BE]` Crear paquete `shared` con tipos base (`Card`, `Suit`, `Rank`, DTOs). `S`
 
 **Criterios de aceptación**
 
-- [ ] `pnpm install` en la raíz instala todos los workspaces sin error.
-- [ ] `pnpm -r build` compila `engine`, `shared`, `api`, `web`.
-- [ ] `pnpm lint` corre en todo el repo y pasa.
-- [ ] `engine` **no** importa nada de `api`, `web`, ni librerías de red/DB (dependencia validada por lint rule o test de imports).
+- [x] `pnpm install` en la raíz instala todos los workspaces sin error.
+- [x] `pnpm -r build` compila `engine`, `shared`, `api`, `web`.
+- [x] `pnpm lint` corre en todo el repo y pasa.
+- [x] `engine` **no** importa nada de `api`, `web`, ni librerías de red/DB (dependencia validada por lint rule o test de imports).
 
 ---
 
@@ -81,8 +83,8 @@ poker/
 
 **Criterios de aceptación (transversales, se verifican en cada fase)**
 
-- [ ] Ninguna regla de poker vive en `api` o `web`: toda está en `engine`.
-- [ ] `api` y `web` importan los tipos de eventos desde `shared` (no redefinen).
+- [x] Ninguna regla de poker vive en `api` o `web`: toda está en `engine`.
+- [x] `api` y `web` importan los tipos de eventos desde `shared` (no redefinen).
 - [ ] Cobertura de tests del `engine` ≥ 85 % de líneas.
 
 ---
@@ -121,7 +123,7 @@ export interface CardTheme {
 
 **Tareas**
 
-- [ ] `[FE]` Definir interfaz `CardTheme` y tipos `Card`/`CardSize` en `shared`/`cards`. `S`
+- [x] `[FE]` Definir interfaz `CardTheme` y tipos `Card`/`CardSize` en `shared`/`cards`. `S`
 - [ ] `[FE]` Implementar `DefaultSvgTheme`: componente SVG paramétrico (rank, palo, color, dorso). `M`
 - [ ] `[FE]` Implementar `ThemeRegistry` con tema activo seleccionable. `S`
 - [ ] `[FE]` Implementar `AssetCardTheme` que resuelve un set de SVG/PNG por convención de nombre. `M`
@@ -174,6 +176,6 @@ Es un concepto, así que **seguridad media**: proteger lo esencial sin sobre-ing
 
 **Criterio de aceptación transversal**
 
-- [ ] `docker compose up --build` levanta todo el stack y la app es accesible en el navegador, en una máquina limpia, sin pasos manuales extra más allá de copiar `.env`.
+- [x] `docker compose up --build` levanta todo el stack y la app es accesible en el navegador, en una máquina limpia, sin pasos manuales extra más allá de copiar `.env`.
 
-Detalle completo en [`01-fase0-setup-docker.md`](./01-fase0-setup-docker.md).
+Detalle completo en [`01-fase0-setup-docker_ok.md`](./01-fase0-setup-docker_ok.md).

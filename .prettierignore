@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+dist
+build
+coverage
+node_modules
+*.min.js
+apps/web/dev-dist
+apps/api/prisma/migrations
