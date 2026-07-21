@@ -6,6 +6,19 @@ export type CreateRoomSubmit = {
   config: Partial<RoomConfig>;
 };
 
+const PASSWORD_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+/** 6 random uppercase letters (matches room password format). */
+function generateRoomPassword(): string {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  let out = '';
+  for (let i = 0; i < 6; i++) {
+    out += PASSWORD_LETTERS[bytes[i]! % PASSWORD_LETTERS.length];
+  }
+  return out;
+}
+
 export function CreateRoom({
   onSubmit,
   busy,
@@ -28,7 +41,8 @@ export function CreateRoom({
   const [timeBankSec, setTimeBankSec] = useState(60);
   const [doubleMinimum, setDoubleMinimum] = useState(false);
 
-  const valid = /^[A-Za-z]{6}$/.test(password);
+  // Empty = open room; otherwise exactly 6 letters.
+  const valid = password === '' || /^[A-Za-z]{6}$/.test(password);
 
   return (
     <section className="panel">
@@ -38,17 +52,27 @@ export function CreateRoom({
         <input value={name} onChange={(e) => setName(e.target.value)} />
       </label>
       <label className="field">
-        Contraseña (6 letras)
-        <input
-          value={password}
-          maxLength={6}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="ABCDEF"
-          autoCapitalize="off"
-        />
+        Contraseña (opcional, 6 letras)
+        <div className="field-row">
+          <input
+            value={password}
+            maxLength={6}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Vacía = sin contraseña"
+            autoCapitalize="off"
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setPassword(generateRoomPassword())}
+          >
+            Generar
+          </button>
+        </div>
       </label>
       {!valid && password.length > 0 ? (
-        <p className="error">Exactamente 6 letras A–Z (sin números ni símbolos)</p>
+        <p className="error">Vacía o exactamente 6 letras A–Z (sin números ni símbolos)</p>
       ) : null}
 
       <label className="field">

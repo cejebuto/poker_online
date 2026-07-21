@@ -2,9 +2,11 @@ import bcrypt from 'bcryptjs';
 
 const PASSWORD_RE = /^[A-Za-z]{6}$/;
 
+/** Empty string = open room (no password). Otherwise exactly 6 letters A–Z. */
 export function validateRoomPassword(password: string): string | null {
+  if (password === '') return null;
   if (!PASSWORD_RE.test(password)) {
-    return 'Password must be exactly 6 letters (A-Z, a-z only)';
+    return 'Password must be empty or exactly 6 letters (A-Z, a-z only)';
   }
   return null;
 }

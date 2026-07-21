@@ -15,7 +15,8 @@ export function JoinRoom({
 }) {
   const [roomIdOrCode, setRoomIdOrCode] = useState(prefillRoomId ?? '');
   const [password, setPassword] = useState('');
-  const valid = /^[A-Za-z]{6}$/.test(password);
+  // Empty for open rooms; otherwise exactly 6 letters.
+  const valid = password === '' || /^[A-Za-z]{6}$/.test(password);
 
   return (
     <section className="panel">
@@ -29,12 +30,13 @@ export function JoinRoom({
         />
       </label>
       <label className="field">
-        Contraseña (6 letras)
+        Contraseña (si la sala tiene)
         <input
           value={password}
           maxLength={6}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="ABCDEF"
+          placeholder="Vacía si no hay contraseña"
+          autoComplete="off"
         />
       </label>
       {error ? <p className="error">{error}</p> : null}

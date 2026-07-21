@@ -22,8 +22,35 @@ describe('security medium', () => {
     assert.equal(rateLimit('k', 5, 60_000).ok, false);
   });
 
+  it('open room allows empty password on create and join', async () => {
+    const host = await createRoom({
+      password: '',
+      user: { displayName: 'OpenHost' },
+      connectionId: 'open1',
+      config: { turnTimeoutMs: 0 },
+    });
+    const guest = await joinRoom({
+      roomId: host.room.roomId,
+      password: '',
+      user: { displayName: 'OpenGuest' },
+      connectionId: 'open2',
+    });
+    assert.equal(guest.room.roomId, host.room.roomId);
+    await assert.rejects(
+      () =>
+        joinRoom({
+          roomId: host.room.roomId,
+          password: 'Wrongg',
+          user: { displayName: 'Nope' },
+          connectionId: 'open3',
+        }),
+      (e: Error & { code?: string }) => e.code === 'BAD_PASSWORD',
+    );
+  });
+
   it('password format + hash never in public state', async () => {
     assert.ok(validateRoomPassword('bad'));
+    assert.equal(validateRoomPassword(''), null); // open room
     assert.equal(validateRoomPassword('Abcdef'), null);
     const hash = await hashPassword('Abcdef');
     assert.notEqual(hash, 'Abcdef');

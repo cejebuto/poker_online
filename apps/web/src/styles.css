@@ -59,6 +59,24 @@ h2 {
   font-size: 0.9rem;
 }
 
+.field-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.field-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+button.secondary {
+  background: #1e293b;
+  border-color: #64748b;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 input {
   border-radius: 0.6rem;
   border: 1px solid #475569;
