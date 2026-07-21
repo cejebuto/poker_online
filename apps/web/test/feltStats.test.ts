@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { PublicPlayer } from '@poker/shared';
 import {
+  canAffordTotal,
+  minAggressiveAction,
+  passiveAction,
+  tripleTargetAmount,
+} from '../src/features/feltActions.js';
+import {
   describeAction,
   formatChips,
   handCounts,
@@ -99,5 +105,43 @@ describe('streetLabel', () => {
 
   it('falls back to a dash when no hand is running', () => {
     assert.equal(streetLabel(undefined), '—');
+  });
+});
+
+describe('feltActions (Vista Mesa)', () => {
+  it('opens with a BB-sized bet when nothing is open', () => {
+    assert.deepEqual(
+      minAggressiveAction({ currentBet: 0, minRaise: 10, bigBlind: 10 }),
+      { kind: 'bet', amount: 10 },
+    );
+  });
+
+  it('min raise is raise-to (current + minRaise), not the size alone', () => {
+    assert.deepEqual(
+      minAggressiveAction({ currentBet: 50, minRaise: 50, bigBlind: 10 }),
+      { kind: 'raise', amount: 100 },
+    );
+  });
+
+  it('x3 is 3× BB with no bet, else 3× current bet as raise-to', () => {
+    assert.deepEqual(tripleTargetAmount({ currentBet: 0, bigBlind: 10 }), {
+      kind: 'bet',
+      amount: 30,
+    });
+    assert.deepEqual(tripleTargetAmount({ currentBet: 50, bigBlind: 10 }), {
+      kind: 'raise',
+      amount: 150,
+    });
+  });
+
+  it('passive slot is check or fold from toCall', () => {
+    assert.equal(passiveAction(0), 'check');
+    assert.equal(passiveAction(25), 'fold');
+  });
+
+  it('canAffordTotal accounts for chips already in this round', () => {
+    assert.equal(canAffordTotal(100, 20, 100), true); // needs 80
+    assert.equal(canAffordTotal(50, 20, 100), false); // needs 80
+    assert.equal(canAffordTotal(30, 0, 30), true);
   });
 });

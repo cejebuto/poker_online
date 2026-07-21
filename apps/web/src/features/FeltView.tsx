@@ -1,6 +1,16 @@
-import { useState } from 'react';
+import { motion } from 'motion/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PublicRoomState } from '@poker/shared';
 import { PlayingCard } from '../cards/PlayingCard';
+import { useJuice } from '../juice/useJuice';
+import { ConfirmModal } from './ConfirmModal';
+import {
+  canAffordTotal,
+  minAggressiveAction,
+  passiveAction,
+  tripleTargetAmount,
+} from './feltActions';
+import { FeltPotDisplay } from './FeltPotDisplay';
 import {
   loadEquityEnabled,
   saveEquityEnabled,
@@ -11,9 +21,16 @@ import { formatChips, handCounts, potOdds, streetLabel } from './feltStats';
 
 type ActionName = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
 
+type PendingConfirm = 'fold' | 'all-in' | null;
+
 /**
- * Table-felt layout for phones: opponents around the felt, own cards large at the
- * bottom, one-tap actions. An alternative to PlayerView, not a replacement.
+ * Zone map (Vista Mesa action bar — tap zones only, no competing drag):
+ *
+ * felt
+ * ├── [pots-zone]     display only — magnet/vanish on hand result
+ * ├── [stack-target]  bottom stats (magnet destination)
+ * ├── [actionbar]     tap zones (see buttons)
+ * └── [confirm-modal] overlay taps only
  */
 export function FeltView({
   state,
@@ -30,20 +47,65 @@ export function FeltView({
   onOpenMenu: () => void;
   onSwitchView: () => void;
 }) {
+  const { play } = useJuice();
+  const [pending, setPending] = useState<PendingConfirm>(null);
+  const stackTargetRef = useRef<HTMLDivElement>(null);
   const hand = state.hand;
   const me = state.players.find((p) => p.playerId === playerId);
   const mySeat = me?.seat ?? null;
   const handOver = !hand || hand.phase === 'COMPLETE';
   const isMyTurn = Boolean(hand && hand.currentToAct === mySeat && !handOver);
 
+  // Drop pending confirms if the turn ends under the modal.
+  useEffect(() => {
+    if (!isMyTurn) setPending(null);
+  }, [isMyTurn]);
+
   const toCall = hand && me ? Math.max(0, hand.currentBet - (me.betThisRound ?? 0)) : 0;
+  const myBet = me?.betThisRound ?? 0;
+  const stack = me?.stack ?? 0;
+  const currentBet = hand?.currentBet ?? 0;
+  const minRaise = hand?.minRaise ?? state.effectiveBigBlind;
+  const bigBlind = state.effectiveBigBlind;
+
   const pots = hand?.pots ?? [];
-  const sidePots = pots.slice(1);
   // potTotal is authoritative while betting is live; `pots` only fills in at showdown.
   const potTotal = hand?.potTotal ?? 0;
-  const mainPot = sidePots.length ? potTotal - sidePots.reduce((s, p) => s + p.amount, 0) : potTotal;
   const counts = handCounts(state.players);
   const odds = potOdds(potTotal, toCall);
+
+  // Server stack already includes payouts; animate from pre-payout base.
+  const result = state.lastResult;
+  const myPayout =
+    result && mySeat !== null ? (result.payouts[mySeat] ?? 0) : 0;
+  const celebrating = Boolean(result && handOver && (hand?.phase === 'COMPLETE' || result));
+  const [credited, setCredited] = useState(0);
+  const creditToken = useRef<string | null>(null);
+
+  useEffect(() => {
+    const token = hand?.handId ?? null;
+    if (creditToken.current !== token) {
+      creditToken.current = token;
+      setCredited(0);
+    }
+    if (!celebrating) setCredited(0);
+  }, [hand?.handId, celebrating]);
+
+  const onPotCredit = useCallback((amount: number) => {
+    if (amount <= 0) return;
+    setCredited((c) => c + amount);
+  }, []);
+
+  const onFlightJuice = useCallback(
+    (kind: 'win' | 'lose') => {
+      play(kind === 'win' ? 'confirm' : 'error');
+    },
+    [play],
+  );
+
+  const stackShown = celebrating
+    ? Math.max(0, stack - myPayout + credited)
+    : stack;
 
   const opponents = state.players.filter(
     (p) => p.playerId !== playerId && p.role !== 'mesa' && p.seat !== null,
@@ -60,6 +122,54 @@ export function FeltView({
   const resultText = state.lastResult
     ? describeHandResult(state.lastResult, state.players)
     : null;
+
+  const passive = passiveAction(toCall);
+  const aggressive = minAggressiveAction({ currentBet, minRaise, bigBlind });
+  const triple = tripleTargetAmount({ currentBet, bigBlind });
+
+  const canAggressive = isMyTurn && canAffordTotal(stack, myBet, aggressive.amount);
+  const canTriple = isMyTurn && canAffordTotal(stack, myBet, triple.amount);
+  const canCall = isMyTurn && toCall > 0 && stack > 0;
+  const canAllIn = isMyTurn && stack > 0;
+
+  const closeModal = useCallback(() => {
+    setPending(null);
+    play('tick');
+  }, [play]);
+
+  const fire = (action: ActionName, amount?: number) => {
+    if (action === 'fold') {
+      play('tick');
+      setPending('fold');
+      return;
+    }
+    if (action === 'all-in') {
+      play('tick');
+      setPending('all-in');
+      return;
+    }
+    if (action === 'check' || action === 'call') {
+      play('tick');
+      onAction(action);
+      return;
+    }
+    play('confirm');
+    onAction(action, amount);
+  };
+
+  const confirmPending = () => {
+    if (pending === 'fold') {
+      play('confirm');
+      setPending(null);
+      onAction('fold');
+      return;
+    }
+    if (pending === 'all-in') {
+      play('throw');
+      setPending(null);
+      onAction('all-in');
+    }
+  };
 
   return (
     <section className="felt">
@@ -82,21 +192,16 @@ export function FeltView({
             {!hand?.community?.length ? <p className="meta">Sin repartir</p> : null}
           </div>
 
-          <div className="felt-pot">
-            <p className="felt-label">Bote principal</p>
-            <strong className="felt-pot-amount">{formatChips(mainPot)}</strong>
-          </div>
-
-          {sidePots.length ? (
-            <div className="felt-sidepots">
-              {sidePots.map((pot, i) => (
-                <div key={i} className="felt-sidepot">
-                  <span className="felt-label">Side pot {i + 1}</span>
-                  <strong>{formatChips(pot.amount)}</strong>
-                </div>
-              ))}
-            </div>
-          ) : null}
+          <FeltPotDisplay
+            pots={pots}
+            potTotal={potTotal}
+            mySeat={mySeat}
+            result={celebrating ? result : null}
+            handId={hand?.handId}
+            stackTargetRef={stackTargetRef}
+            onCredit={onPotCredit}
+            onFlightJuice={onFlightJuice}
+          />
         </div>
 
         <aside className="felt-status">
@@ -111,7 +216,7 @@ export function FeltView({
             <dt>Última acción</dt>
             <dd>{lastAction ?? '—'}</dd>
             <dt>Apuesta más alta</dt>
-            <dd>{formatChips(hand?.currentBet ?? 0)}</dd>
+            <dd>{formatChips(currentBet)}</dd>
           </dl>
         </aside>
       </div>
@@ -156,14 +261,22 @@ export function FeltView({
       </div>
 
       <div className="felt-actionbar">
-        <div className="felt-stats">
+        <div className="felt-stats zone-felt-stats">
           <div>
             <span className="felt-label">To call</span>
             <strong>{formatChips(toCall)}</strong>
           </div>
-          <div>
+          <div ref={stackTargetRef} className="felt-stack-target zone-felt-stack">
             <span className="felt-label">Tu stack</span>
-            <strong className="accent">{formatChips(me?.stack ?? 0)}</strong>
+            <motion.strong
+              className="accent"
+              key={stackShown}
+              initial={celebrating && credited > 0 ? { scale: 1.12 } : false}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+            >
+              {formatChips(stackShown)}
+            </motion.strong>
           </div>
           <div>
             <button
@@ -174,6 +287,7 @@ export function FeltView({
                 const next = !equityOn;
                 setEquityOn(next);
                 saveEquityEnabled(next);
+                play('tick');
               }}
             >
               <span className="felt-label">Equity</span>
@@ -194,66 +308,101 @@ export function FeltView({
           </div>
         </div>
 
-        <div className="felt-buttons">
-          <button
-            type="button"
-            className="fold"
-            disabled={!isMyTurn}
-            onClick={() => onAction('fold')}
-          >
-            Fold
-          </button>
-          {toCall === 0 ? (
-            <button
+        {/* Zone: action taps only — touch-action manipulation */}
+        <div className="felt-buttons zone-felt-actions">
+          {passive === 'check' ? (
+            <motion.button
               type="button"
-              className="call"
+              className="check"
               disabled={!isMyTurn}
-              onClick={() => onAction('check')}
+              whileTap={isMyTurn ? { scale: 0.96 } : undefined}
+              onClick={() => fire('check')}
             >
               Check
-            </button>
+            </motion.button>
           ) : (
-            <button
+            <motion.button
+              type="button"
+              className="fold"
+              disabled={!isMyTurn}
+              whileTap={isMyTurn ? { scale: 0.96 } : undefined}
+              onClick={() => fire('fold')}
+            >
+              Fold
+            </motion.button>
+          )}
+
+          {toCall > 0 ? (
+            <motion.button
               type="button"
               className="call"
-              disabled={!isMyTurn}
-              onClick={() => onAction('call')}
+              disabled={!canCall}
+              whileTap={canCall ? { scale: 0.96 } : undefined}
+              onClick={() => fire('call')}
             >
               Call
               <small>{formatChips(toCall)}</small>
-            </button>
+            </motion.button>
+          ) : (
+            <span className="felt-btn-spacer" aria-hidden="true" />
           )}
-          <button
+
+          <motion.button
             type="button"
             className="raise"
-            disabled={!isMyTurn || (me?.stack ?? 0) <= toCall}
-            onClick={() => onAction('raise', (hand?.minRaise ?? 0) || undefined)}
+            disabled={!canAggressive}
+            whileTap={canAggressive ? { scale: 0.96 } : undefined}
+            onClick={() => fire(aggressive.kind, aggressive.amount)}
           >
-            Raise
-          </button>
-          <button
+            {aggressive.kind === 'bet' ? 'Bet' : 'Raise'}
+            <small>{formatChips(aggressive.amount)}</small>
+          </motion.button>
+
+          <motion.button
             type="button"
             className="triple"
-            disabled={!isMyTurn || (me?.stack ?? 0) <= (hand?.currentBet ?? 0) * 3}
-            onClick={() => onAction('raise', (hand?.currentBet ?? 0) * 3)}
+            disabled={!canTriple}
+            whileTap={canTriple ? { scale: 0.96 } : undefined}
+            onClick={() => fire(triple.kind, triple.amount)}
           >
             x3
-            <small>{formatChips((hand?.currentBet ?? 0) * 3)}</small>
-          </button>
-          <button
+            <small>{formatChips(triple.amount)}</small>
+          </motion.button>
+
+          <motion.button
             type="button"
             className="custom"
-            disabled={!isMyTurn}
-            onClick={() => onAction('all-in')}
+            disabled={!canAllIn}
+            whileTap={canAllIn ? { scale: 0.96 } : undefined}
+            onClick={() => fire('all-in')}
           >
             All-in
-          </button>
+          </motion.button>
         </div>
 
         <button type="button" className="ghost small felt-switch" onClick={onSwitchView}>
           Vista clásica
         </button>
       </div>
+
+      <ConfirmModal
+        open={pending === 'fold'}
+        title="¿Ir al mazo?"
+        message="Vas a tirar tus cartas. Esta acción no se puede deshacer."
+        confirmLabel="Fold"
+        tone="danger"
+        onCancel={closeModal}
+        onConfirm={confirmPending}
+      />
+      <ConfirmModal
+        open={pending === 'all-in'}
+        title="¿All-in?"
+        message={`Vas a poner todo tu stack (${formatChips(stack)}) en el bote.`}
+        confirmLabel="All-in"
+        tone="warn"
+        onCancel={closeModal}
+        onConfirm={confirmPending}
+      />
     </section>
   );
 }
