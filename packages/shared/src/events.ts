@@ -52,6 +52,11 @@ export type WsClientEvent =
       action: PlayerActionName;
       amount?: number;
       clientActionId: string;
+    }
+  | {
+      type: 'player:rebuy';
+      /** Chips to add (defaults to startingStack). */
+      amount?: number;
     };
 
 export type WsServerEvent =
@@ -123,6 +128,23 @@ export type WsServerEvent =
       seat: number;
       action: PlayerActionName;
       reason: 'timeout' | 'disconnect';
+    }
+  | {
+      type: 'player:rebuy_ok';
+      playerId: string;
+      stack: number;
+      rebuyCount: number;
+    }
+  | {
+      type: 'tournament:level';
+      levelIndex: number;
+      smallBlind: number;
+      bigBlind: number;
+      levelEndsAt: number | null;
+    }
+  | {
+      type: 'tournament:finished';
+      ranking: { playerId: string; displayName: string; place: number }[];
     };
 
 export type HealthResponse = {

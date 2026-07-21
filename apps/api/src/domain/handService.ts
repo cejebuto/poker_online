@@ -21,6 +21,11 @@ import {
   rechargeTimeBanks,
   scheduleTurnTimer,
 } from './timerService.js';
+import {
+  applyPostHandModeRules,
+  currentBlinds,
+  maybeAdvanceBlindLevel,
+} from './modes.js';
 
 export type HandBroadcast = {
   domainEvents: DomainEvent[];
@@ -143,15 +148,20 @@ function afterTurnChange(room: InternalRoom): void {
 }
 
 export function startRoomHand(room: InternalRoom): HandBroadcast {
+  if (room.phase === 'FINISHED') fail('TOURNAMENT_OVER', 'Tournament already finished');
   if (room.phase === 'IN_HAND' && room.hand && room.hand.phase !== 'COMPLETE') {
     fail('HAND_IN_PROGRESS', 'A hand is already in progress');
   }
+
+  maybeAdvanceBlindLevel(room);
+
   const seated = [...room.players.values()].filter(
     (p) =>
       p.role !== 'mesa' &&
       p.seat !== null &&
       p.stack > 0 &&
-      p.connectionStatus !== 'sitting_out',
+      p.connectionStatus !== 'sitting_out' &&
+      p.connectionStatus !== 'eliminated',
   );
   if (seated.length < 2) fail('NOT_ENOUGH_PLAYERS', 'Need at least 2 players with chips');
 
@@ -167,13 +177,14 @@ export function startRoomHand(room: InternalRoom): HandBroadcast {
     stacks[p.seat!] = p.stack;
   }
 
+  const blinds = currentBlinds(room);
   const result = startHand(
     {
       handId: newId('hand'),
       stacks,
       button,
-      smallBlind: room.config.smallBlind,
-      bigBlind: room.config.bigBlind,
+      smallBlind: blinds.smallBlind,
+      bigBlind: blinds.bigBlind,
     },
     createCryptoRng(),
   );
@@ -184,11 +195,12 @@ export function startRoomHand(room: InternalRoom): HandBroadcast {
   room.phase = result.value.state.phase === 'COMPLETE' ? 'LOBBY' : 'IN_HAND';
   room.processedActionIds.clear();
   room.actionResults.clear();
+  room.handsPlayed += 1;
   syncStacksFromHand(room, room.hand);
 
   const broadcast = extractFromDomain(room, room.hand, result.value.events);
   if (room.hand.phase === 'COMPLETE') {
-    room.phase = 'LOBBY';
+    finishHandSideEffects(room);
   }
 
   void persistTransitions(
@@ -199,6 +211,13 @@ export function startRoomHand(room: InternalRoom): HandBroadcast {
   );
   afterTurnChange(room);
   return broadcast;
+}
+
+function finishHandSideEffects(room: InternalRoom): void {
+  if (room.phase !== 'FINISHED') {
+    room.phase = 'LOBBY';
+  }
+  applyPostHandModeRules(room);
 }
 
 export function applyPlayerAction(
@@ -274,7 +293,7 @@ export function applyPlayerAction(
 
   const completed = room.hand.phase === 'COMPLETE';
   if (completed) {
-    room.phase = 'LOBBY';
+    finishHandSideEffects(room);
   }
 
   void persistTransitions(room, result.value.events, room.hand.handId, completed);

@@ -2,25 +2,42 @@ import type { Card } from './cards.js';
 
 export type PlayerRole = 'host' | 'player' | 'mesa';
 
-export type RoomPhase = 'LOBBY' | 'IN_HAND' | 'PAUSED' | 'CLOSED';
+export type RoomPhase = 'LOBBY' | 'IN_HAND' | 'PAUSED' | 'CLOSED' | 'FINISHED';
+
+/** One tournament blind level. */
+export type BlindLevel = {
+  smallBlind: number;
+  bigBlind: number;
+  /** Duration of this level in ms (time-based). */
+  durationMs: number;
+};
 
 export type RoomConfig = {
   name: string;
   maxPlayers: number;
+  startingStack: number;
+  mode: 'cash' | 'tournament';
+  /** Initial / cash blinds (tournament overrides via structure). */
   smallBlind: number;
   bigBlind: number;
-  startingStack: number;
-  /** cash | tournament — full behavior in later phase */
-  mode: 'cash' | 'tournament';
   /**
-   * Turn timer in ms. 0 / undefined = no limit.
-   * Default applied by server if omitted.
+   * Turn timer in ms. 0 = no limit.
+   * Also accept turnTimerSec in UI — converted to ms on create.
    */
   turnTimeoutMs?: number;
-  /** Extra seconds bank per player (ms). */
   timeBankMs?: number;
-  /** How long a disconnected player keeps seat before sitting out (ms). */
   reconnectWindowMs?: number;
+  /** Cash: allow rebuy between hands. Tournament: typically false. */
+  allowRebuy?: boolean;
+  /** Max number of rebuys per player (cash). */
+  rebuyMax?: number;
+  /**
+   * When true, the minimum open-bet is 2× bigBlind (and min-raise floor doubles).
+   * Spec §19: quick-bet / min-raise convenience for the table.
+   */
+  doubleMinimum?: boolean;
+  /** Tournament only: blind ladder. Default structure applied if empty. */
+  blindStructure?: BlindLevel[];
 };
 
 export type UserInfo = {
@@ -36,11 +53,12 @@ export type PublicPlayer = {
   seat: number | null;
   stack: number;
   connected: boolean;
-  status?: 'ACTIVE' | 'FOLDED' | 'ALL_IN' | 'SITTING_OUT' | 'DISCONNECTED';
-  /** Bet this round (public). */
+  status?: 'ACTIVE' | 'FOLDED' | 'ALL_IN' | 'SITTING_OUT' | 'DISCONNECTED' | 'ELIMINATED';
   betThisRound?: number;
-  /** Remaining time bank (ms). */
   timeBankMs?: number;
+  rebuyCount?: number;
+  /** Tournament finish place (1 = winner). */
+  finishPlace?: number;
 };
 
 export type PublicPot = {
@@ -57,14 +75,22 @@ export type PublicHandState = {
   currentBet: number;
   minRaise: number;
   button: number;
-  /** Never includes other players' hole cards. */
   yourCards?: Card[];
-  /** Wall-clock when current turn started (ms epoch). */
   turnStartedAt?: number;
-  /** Configured turn timeout (ms); 0 = unlimited. */
   turnTimeoutMs?: number;
-  /** Time bank remaining for current actor (ms). */
   actorTimeBankMs?: number;
+};
+
+export type PublicTournamentState = {
+  levelIndex: number;
+  smallBlind: number;
+  bigBlind: number;
+  levelEndsAt: number | null;
+  nextSmallBlind: number | null;
+  nextBigBlind: number | null;
+  playersRemaining: number;
+  finished: boolean;
+  ranking: { playerId: string; displayName: string; place: number }[];
 };
 
 /** Client-safe room state — no password, no deck, no foreign hole cards. */
@@ -82,4 +108,8 @@ export type PublicRoomState = {
     payouts: Record<number, number>;
     winners: number[];
   };
+  tournament?: PublicTournamentState;
+  /** Effective blinds after structure / doubleMinimum. */
+  effectiveSmallBlind: number;
+  effectiveBigBlind: number;
 };

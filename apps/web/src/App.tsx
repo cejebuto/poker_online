@@ -197,13 +197,13 @@ export function App() {
         <CreateRoom
           busy={busy}
           error={error}
-          onSubmit={({ password, name, maxPlayers }) => {
+          onSubmit={({ password, config }) => {
             setBusy(true);
             send({
               type: 'room:create',
               password,
               user: { displayName: user.displayName, avatar: user.avatar },
-              config: { name, maxPlayers },
+              config,
             });
           }}
         />
@@ -246,6 +246,7 @@ export function App() {
             setScreen('home');
           }}
           onKick={(id) => send({ type: 'player:kick', playerId: id })}
+          onRebuy={() => send({ type: 'player:rebuy' })}
         />
       )}
       {screen === 'play' && roomState && playerId && role !== 'mesa' && (

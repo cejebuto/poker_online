@@ -580,6 +580,43 @@ button.small {
   border-color: #22c55e;
 }
 
+.config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.tournament-banner {
+  background: #1e293b;
+  border: 1px solid #fbbf24;
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+select {
+  border-radius: 0.6rem;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.65rem 0.75rem;
+  font-size: 1rem;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

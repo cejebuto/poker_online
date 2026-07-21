@@ -26,6 +26,15 @@ docker compose up --build
 - API health: http://localhost:3001/health → `{ "status": "ok", ... }`
 - WS: `ws://localhost:3001/ws` (también proxy en `/ws` vía nginx de `web`)
 
+### Seguridad media (concepto)
+
+- Contraseña de sala: 6 letras, **bcrypt** (nunca en payloads).
+- JWT HS256 con secreto de entorno (`JWT_SECRET`) y expiración 7d.
+- Rate limiting por conexión (joins/actions/creates).
+- CORS restringido a `WEB_ORIGIN`.
+- En **producción**: servir detrás de TLS (WSS); no exponer `JWT_SECRET` ni `.env`.
+- Rotación de JWT: cambiar `JWT_SECRET` invalida sesiones (re-join).
+
 ## Desarrollo local
 
 Requisitos: Node ≥ 20, pnpm, Docker (para Postgres/Redis).

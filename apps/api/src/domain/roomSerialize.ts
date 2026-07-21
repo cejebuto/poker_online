@@ -1,5 +1,5 @@
 import type { HandState } from '@poker/engine';
-import type { InternalPlayer, InternalRoom } from './types.js';
+import type { InternalPlayer, InternalRoom, TournamentRuntime } from './types.js';
 
 /** JSON-safe room dump for snapshots / Redis. Includes private hand state (server-only). */
 export type SerializedRoom = {
@@ -15,6 +15,8 @@ export type SerializedRoom = {
   turnStartedAt: number | null;
   turnSeat: number | null;
   processedActionIds: string[];
+  handsPlayed: number;
+  tournament: TournamentRuntime;
   players: Array<{
     playerId: string;
     displayName: string;
@@ -26,6 +28,8 @@ export type SerializedRoom = {
     connectionStatus: InternalPlayer['connectionStatus'];
     disconnectedAt: number | null;
     timeBankMs: number;
+    rebuyCount: number;
+    finishPlace?: number;
   }>;
   hand?: HandState;
 };
@@ -44,6 +48,13 @@ export function serializeRoom(room: InternalRoom): SerializedRoom {
     turnStartedAt: room.turnStartedAt,
     turnSeat: room.turnSeat,
     processedActionIds: [...room.processedActionIds],
+    handsPlayed: room.handsPlayed,
+    tournament: {
+      levelIndex: room.tournament.levelIndex,
+      levelStartedAt: room.tournament.levelStartedAt,
+      ranking: [...room.tournament.ranking],
+      finished: room.tournament.finished,
+    },
     players: [...room.players.values()].map((p) => ({
       playerId: p.playerId,
       displayName: p.displayName,
@@ -55,6 +66,8 @@ export function serializeRoom(room: InternalRoom): SerializedRoom {
       connectionStatus: p.connectionStatus,
       disconnectedAt: p.disconnectedAt,
       timeBankMs: p.timeBankMs,
+      rebuyCount: p.rebuyCount,
+      ...(p.finishPlace !== undefined ? { finishPlace: p.finishPlace } : {}),
     })),
     ...(room.hand ? { hand: room.hand } : {}),
   };
@@ -63,6 +76,12 @@ export function serializeRoom(room: InternalRoom): SerializedRoom {
 export function deserializeRoom(data: SerializedRoom): InternalRoom {
   const players = new Map<string, InternalPlayer>();
   for (const p of data.players) {
+    const status =
+      p.connectionStatus === 'eliminated'
+        ? 'eliminated'
+        : p.connectionStatus === 'sitting_out'
+          ? 'sitting_out'
+          : 'disconnected';
     players.set(p.playerId, {
       playerId: p.playerId,
       displayName: p.displayName,
@@ -71,9 +90,11 @@ export function deserializeRoom(data: SerializedRoom): InternalRoom {
       seat: p.seat,
       stack: p.stack,
       connected: false,
-      connectionStatus: p.connectionStatus === 'sitting_out' ? 'sitting_out' : 'disconnected',
+      connectionStatus: status,
       disconnectedAt: p.disconnectedAt ?? Date.now(),
       timeBankMs: p.timeBankMs,
+      rebuyCount: p.rebuyCount ?? 0,
+      ...(p.finishPlace !== undefined ? { finishPlace: p.finishPlace } : {}),
       connectionIds: new Set(),
     });
   }
@@ -91,6 +112,13 @@ export function deserializeRoom(data: SerializedRoom): InternalRoom {
     turnSeat: data.turnSeat,
     processedActionIds: new Set(data.processedActionIds),
     actionResults: new Map(),
+    handsPlayed: data.handsPlayed ?? 0,
+    tournament: data.tournament ?? {
+      levelIndex: 0,
+      levelStartedAt: Date.now(),
+      ranking: [],
+      finished: false,
+    },
     players,
     ...(data.hand ? { hand: data.hand } : {}),
   };

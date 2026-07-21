@@ -2,11 +2,13 @@ import type { Card, PublicPlayer, PublicRoomState } from '@poker/shared';
 import type { InternalPlayer, InternalRoom } from './types.js';
 import { turnTimeoutMs } from './types.js';
 import { env } from '../config/env.js';
+import { buildPublicTournament, currentBlinds } from './modes.js';
 
 function toPublicPlayer(p: InternalPlayer): PublicPlayer {
   let status: PublicPlayer['status'];
   if (p.connectionStatus === 'sitting_out') status = 'SITTING_OUT';
   else if (p.connectionStatus === 'disconnected') status = 'DISCONNECTED';
+  else if (p.connectionStatus === 'eliminated') status = 'ELIMINATED';
 
   return {
     playerId: p.playerId,
@@ -18,6 +20,8 @@ function toPublicPlayer(p: InternalPlayer): PublicPlayer {
     connected: p.connected,
     ...(status ? { status } : {}),
     timeBankMs: p.timeBankMs,
+    rebuyCount: p.rebuyCount,
+    ...(p.finishPlace !== undefined ? { finishPlace: p.finishPlace } : {}),
   };
 }
 
@@ -51,6 +55,7 @@ export function toPublicRoomState(
   }
 
   const joinUrl = `${env.webOrigin.replace(/\/$/, '')}/join/${room.roomId}`;
+  const blinds = currentBlinds(room);
 
   const state: PublicRoomState = {
     roomId: room.roomId,
@@ -61,6 +66,11 @@ export function toPublicRoomState(
     players,
     version: room.version,
     joinUrl,
+    effectiveSmallBlind: blinds.smallBlind,
+    effectiveBigBlind: blinds.bigBlind,
+    ...(buildPublicTournament(room)
+      ? { tournament: buildPublicTournament(room) }
+      : {}),
   };
 
   if (room.hand) {

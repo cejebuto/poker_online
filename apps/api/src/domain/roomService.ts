@@ -1,12 +1,13 @@
 import type { RoomConfig, UserInfo } from '@poker/shared';
+import { sanitizeDisplayName } from '@poker/shared';
 import { hashPassword, validateRoomPassword, verifyPassword } from '../auth/password.js';
 import { signSession } from '../auth/jwt.js';
 import { env } from '../config/env.js';
 import { newId, newRoomCode } from './ids.js';
 import { roomRegistry } from './roomRegistry.js';
 import {
-  DEFAULT_CONFIG,
   ROOM_DESTROY_GRACE_MS,
+  normalizeRoomConfig,
   timeBankDefaultMs,
   type InternalPlayer,
   type InternalRoom,
@@ -77,7 +78,8 @@ export async function createRoom(input: {
 }> {
   const pwdErr = validateRoomPassword(input.password);
   if (pwdErr) fail('INVALID_PASSWORD_FORMAT', pwdErr);
-  if (!input.user.displayName?.trim()) fail('INVALID_USER', 'displayName required');
+  const displayName = sanitizeDisplayName(input.user.displayName ?? '');
+  if (!displayName) fail('INVALID_USER', 'displayName required');
 
   const passwordHash = await hashPassword(input.password);
   const roomId = newId('room');
@@ -85,16 +87,15 @@ export async function createRoom(input: {
   while (roomRegistry.getByCode(code)) code = newRoomCode();
 
   const playerId = newId('pl');
-  const config: RoomConfig = {
-    ...DEFAULT_CONFIG,
+  const config = normalizeRoomConfig({
     ...input.config,
-    name: input.config?.name?.trim() || DEFAULT_CONFIG.name,
-  };
+    name: sanitizeDisplayName(input.config?.name ?? 'Poker Night') || 'Poker Night',
+  });
 
   const player: InternalPlayer = {
     playerId,
-    displayName: input.user.displayName.trim(),
-    ...(input.user.avatar ? { avatar: input.user.avatar } : {}),
+    displayName,
+    ...(input.user.avatar ? { avatar: input.user.avatar.slice(0, 8) } : {}),
     role: 'host',
     seat: 0,
     stack: config.startingStack,
@@ -102,6 +103,7 @@ export async function createRoom(input: {
     connectionStatus: 'connected',
     disconnectedAt: null,
     timeBankMs: timeBankDefaultMs(config),
+    rebuyCount: 0,
     connectionIds: new Set([input.connectionId]),
   };
 
@@ -120,6 +122,13 @@ export async function createRoom(input: {
     createdAt: Date.now(),
     turnStartedAt: null,
     turnSeat: null,
+    tournament: {
+      levelIndex: 0,
+      levelStartedAt: Date.now(),
+      ranking: [],
+      finished: false,
+    },
+    handsPlayed: 0,
   };
 
   roomRegistry.set(room);
@@ -148,7 +157,7 @@ export async function joinRoom(input: {
     (input.roomId && roomRegistry.get(input.roomId)) ||
     (input.code && roomRegistry.getByCode(input.code)) ||
     undefined;
-  if (!room || room.phase === 'CLOSED') {
+  if (!room || room.phase === 'CLOSED' || room.phase === 'FINISHED') {
     fail('ROOM_NOT_FOUND', 'Room not found');
   }
 
@@ -167,6 +176,7 @@ export async function joinRoom(input: {
       connectionStatus: 'connected',
       disconnectedAt: null,
       timeBankMs: 0,
+      rebuyCount: 0,
       connectionIds: new Set([input.connectionId]),
     };
     room.players.set(playerId, player);
@@ -181,15 +191,19 @@ export async function joinRoom(input: {
     return { room, player, token };
   }
 
-  if (!input.user.displayName?.trim()) fail('INVALID_USER', 'displayName required');
+  const displayName = sanitizeDisplayName(input.user.displayName ?? '');
+  if (!displayName) fail('INVALID_USER', 'displayName required');
   if (playingCount(room) >= room.config.maxPlayers) fail('ROOM_FULL', 'Room is full');
+  if (room.phase === 'IN_HAND' && room.config.mode === 'tournament') {
+    fail('TOURNAMENT_IN_PROGRESS', 'Cannot join tournament mid-hand');
+  }
 
   const seat = assignSeat(room);
   const playerId = newId('pl');
   const player: InternalPlayer = {
     playerId,
-    displayName: input.user.displayName.trim(),
-    ...(input.user.avatar ? { avatar: input.user.avatar } : {}),
+    displayName,
+    ...(input.user.avatar ? { avatar: input.user.avatar.slice(0, 8) } : {}),
     role: 'player',
     seat,
     stack: room.config.startingStack,
@@ -197,6 +211,7 @@ export async function joinRoom(input: {
     connectionStatus: 'connected',
     disconnectedAt: null,
     timeBankMs: timeBankDefaultMs(room.config),
+    rebuyCount: 0,
     connectionIds: new Set([input.connectionId]),
   };
   room.players.set(playerId, player);
@@ -303,7 +318,7 @@ export function updateConfig(
 ): void {
   if (room.hostPlayerId !== hostId) fail('FORBIDDEN', 'Only host can update config');
   if (room.phase !== 'LOBBY') fail('INVALID_PHASE', 'Config locked during hand');
-  room.config = { ...room.config, ...patch };
+  room.config = normalizeRoomConfig({ ...room.config, ...patch });
   room.version += 1;
   void persistRoomMeta(room);
 }

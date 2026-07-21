@@ -17,6 +17,8 @@ import {
 } from '../domain/roomService.js';
 import { applyPlayerAction, startRoomHand } from '../domain/handService.js';
 import { scheduleDisconnectWatch } from '../domain/timerService.js';
+import { applyRebuy } from '../domain/modes.js';
+import { RL, rateLimit } from '../domain/rateLimit.js';
 import type { ClientSession } from './hub.js';
 import { hub } from './hub.js';
 
@@ -45,6 +47,16 @@ export async function handleClientEvent(
   event: WsClientEvent,
 ): Promise<void> {
   try {
+    const gen = rateLimit(`${session.connectionId}:gen`, RL.general.limit, RL.general.windowMs);
+    if (!gen.ok) {
+      hub.send(session.connectionId, {
+        type: 'error',
+        code: 'RATE_LIMIT',
+        message: `Too many requests — retry in ${Math.ceil(gen.retryAfterMs / 1000)}s`,
+      });
+      return;
+    }
+
     switch (event.type) {
       case 'ping':
         hub.send(session.connectionId, {
@@ -101,6 +113,15 @@ export async function handleClientEvent(
       }
 
       case 'room:create': {
+        const rl = rateLimit(`${session.connectionId}:create`, RL.create.limit, RL.create.windowMs);
+        if (!rl.ok) {
+          hub.send(session.connectionId, {
+            type: 'error',
+            code: 'RATE_LIMIT',
+            message: 'Too many room creates',
+          });
+          return;
+        }
         const result = await createRoom({
           password: event.password,
           user: event.user,
@@ -126,6 +147,15 @@ export async function handleClientEvent(
 
       case 'room:join':
       case 'mesa:attach': {
+        const rl = rateLimit(`${session.connectionId}:join`, RL.join.limit, RL.join.windowMs);
+        if (!rl.ok) {
+          hub.send(session.connectionId, {
+            type: 'error',
+            code: 'RATE_LIMIT',
+            message: 'Too many join attempts',
+          });
+          return;
+        }
         const asMesa = event.type === 'mesa:attach';
         const result = await joinRoom({
           roomId: event.roomId,
@@ -258,6 +288,19 @@ export async function handleClientEvent(
           hub.send(session.connectionId, error('UNAUTHORIZED', 'Not in a room'));
           return;
         }
+        const rl = rateLimit(
+          `${session.connectionId}:action`,
+          RL.action.limit,
+          RL.action.windowMs,
+        );
+        if (!rl.ok) {
+          hub.send(session.connectionId, {
+            type: 'error',
+            code: 'RATE_LIMIT',
+            message: 'Too many actions',
+          });
+          return;
+        }
         await roomLocks.withLock(session.roomId, async () => {
           const room = roomRegistry.get(session.roomId!);
           if (!room) failNotFound();
@@ -270,6 +313,46 @@ export async function handleClientEvent(
               clientActionId: event.clientActionId,
             });
             emitHandBroadcast(room.roomId, bc);
+            if (room.tournament.finished) {
+              hub.broadcast(room.roomId, {
+                type: 'tournament:finished',
+                ranking: room.tournament.ranking,
+              });
+            }
+          } catch (err) {
+            const e = getServiceError(err);
+            hub.send(session.connectionId, error(e.code, e.message));
+          }
+        });
+        return;
+      }
+
+      case 'player:rebuy': {
+        if (!session.roomId || !session.playerId) {
+          hub.send(session.connectionId, error('UNAUTHORIZED', 'Not in a room'));
+          return;
+        }
+        const rl = rateLimit(`${session.connectionId}:rebuy`, RL.rebuy.limit, RL.rebuy.windowMs);
+        if (!rl.ok) {
+          hub.send(session.connectionId, {
+            type: 'error',
+            code: 'RATE_LIMIT',
+            message: 'Too many rebuy attempts',
+          });
+          return;
+        }
+        await roomLocks.withLock(session.roomId, () => {
+          const room = roomRegistry.get(session.roomId!);
+          if (!room) failNotFound();
+          try {
+            const res = applyRebuy(room, session.playerId!, event.amount);
+            hub.broadcast(room.roomId, {
+              type: 'player:rebuy_ok',
+              playerId: session.playerId!,
+              stack: res.stack,
+              rebuyCount: res.rebuyCount,
+            });
+            broadcastSnapshots(room.roomId);
           } catch (err) {
             const e = getServiceError(err);
             hub.send(session.connectionId, error(e.code, e.message));
