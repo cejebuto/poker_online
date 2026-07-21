@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PublicRoomState, WsServerEvent } from '@poker/shared';
+import type { PublicRoomState, RoomSummary, WsServerEvent } from '@poker/shared';
 import { connectWs, type ConnectionStatus, type WsHandle } from './net/wsClient';
 import { clearSession, loadSession, saveSession } from './net/session';
 import { UserGate } from './features/UserGate';
@@ -42,6 +42,8 @@ export function App() {
   const [notice, setNotice] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [themesReturn, setThemesReturn] = useState<Screen>('home');
+  const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
+  const [pickedRoom, setPickedRoom] = useState<string | undefined>(undefined);
   const wsRef = useRef<WsHandle | null>(null);
   const resumeAttempted = useRef(false);
   const prefill = useMemo(() => joinRoomIdFromPath(), []);
@@ -108,6 +110,9 @@ export function App() {
           }
         }
         break;
+      case 'rooms:listed':
+        setRooms(event.rooms);
+        break;
       case 'player:auto_acted': {
         const players = roomState?.players ?? [];
         const mySeat = players.find((p) => p.playerId === playerId)?.seat ?? null;
@@ -167,6 +172,7 @@ export function App() {
           resumeAttempted.current = true;
           handle.send({ type: 'session:resume', token: session.token });
         }
+        handle.send({ type: 'rooms:list' });
       },
     });
     wsRef.current = handle;
@@ -177,6 +183,11 @@ export function App() {
     setError('');
     wsRef.current?.send(event);
   };
+
+  // Refresh the directory whenever the user lands back on the home screen.
+  useEffect(() => {
+    if (screen === 'home') wsRef.current?.send({ type: 'rooms:list' });
+  }, [screen]);
 
   if (!user && screen === 'user') {
     return (
@@ -202,6 +213,12 @@ export function App() {
             onCreate={() => setScreen('create')}
             onJoin={() => setScreen('join')}
             onMesa={() => setScreen('mesa-join')}
+            rooms={rooms}
+            onRefreshRooms={() => send({ type: 'rooms:list' })}
+            onPickRoom={(room, as) => {
+              setPickedRoom(room.code);
+              setScreen(as === 'mesa' ? 'mesa-join' : 'join');
+            }}
           />
           <button type="button" className="ghost" onClick={() => openThemes('home')}>
             Ajustes de cartas / temas
@@ -229,7 +246,7 @@ export function App() {
       {(screen === 'join' || screen === 'mesa-join') && user && (
         <JoinRoom
           mode={screen === 'mesa-join' ? 'mesa' : 'player'}
-          prefillRoomId={prefill}
+          prefillRoomId={pickedRoom ?? prefill}
           busy={busy}
           error={error}
           onSubmit={({ roomIdOrCode, password }) => {

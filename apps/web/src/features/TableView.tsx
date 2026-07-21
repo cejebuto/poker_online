@@ -46,6 +46,11 @@ export function TableView({
           >
             <strong>
               {p.displayName} (#{p.seat})
+              {p.seat !== null && hand?.button === p.seat ? (
+                <span className="dealer-badge" title="Dealer">
+                  DEALER
+                </span>
+              ) : null}
               {p.status ? ` · ${p.status}` : ''}
             </strong>
             <IsoChipStack amount={p.stack} compact />

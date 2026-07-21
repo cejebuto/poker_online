@@ -48,6 +48,8 @@ export function PlayerView({
     ? describeHandResult(state.lastResult, state.players)
     : null;
 
+  // Hidden by default: the table is shared and the code is what lets people in.
+  const [codeVisible, setCodeVisible] = useState(false);
   const [equityOn, setEquityOn] = useState(() => loadEquityEnabled());
   const equity = useEquity({
     hero: hand?.yourCards,
@@ -139,11 +141,33 @@ export function PlayerView({
         />
       )}
 
+      <div className="table-id row between">
+        <span>
+          <strong>{state.config.name}</strong>
+          <span className="meta"> · código </span>
+          <code>{codeVisible ? state.code : '••••••'}</code>
+        </span>
+        <button
+          type="button"
+          className="ghost small"
+          aria-label={codeVisible ? 'Ocultar código' : 'Mostrar código'}
+          aria-pressed={codeVisible}
+          onClick={() => setCodeVisible((v) => !v)}
+        >
+          {codeVisible ? '🙈' : '👁️'}
+        </button>
+      </div>
+
       <ul className="player-list compact">
         {state.players.map((p) => (
           <li key={p.playerId} className={hand?.currentToAct === p.seat ? 'to-act' : ''}>
             <span>
               #{p.seat} {p.displayName}
+              {p.seat !== null && hand?.button === p.seat ? (
+                <span className="dealer-badge" title="Dealer">
+                  DEALER
+                </span>
+              ) : null}
               {p.status ? ` · ${p.status}` : ''}
               {hand?.currentToAct === p.seat ? ' ◀' : ''}
             </span>

@@ -32,6 +32,8 @@ export type InternalRoom = {
   roomId: string;
   code: string;
   passwordHash: string;
+  /** Whether joining requires a password (empty passwords are still hashed). */
+  hasPassword: boolean;
   hostPlayerId: string;
   phase: RoomPhase;
   config: RoomConfig;

@@ -19,6 +19,7 @@ import { applyPlayerAction, startRoomHand } from '../domain/handService.js';
 import { scheduleDisconnectWatch } from '../domain/timerService.js';
 import { applyRebuy } from '../domain/modes.js';
 import { readySummary, setPlayerReady } from '../domain/readiness.js';
+import { listActiveRooms } from '../domain/roomDirectory.js';
 import { RL, rateLimit } from '../domain/rateLimit.js';
 import type { ClientSession } from './hub.js';
 import { hub } from './hub.js';
@@ -64,6 +65,13 @@ export async function handleClientEvent(
           type: 'pong',
           requestId: event.requestId,
           ts: Date.now(),
+        });
+        return;
+
+      case 'rooms:list':
+        hub.send(session.connectionId, {
+          type: 'rooms:listed',
+          rooms: listActiveRooms(),
         });
         return;
 

@@ -8,6 +8,7 @@ import type {
   PublicPlayer,
   PublicRoomState,
   RoomConfig,
+  RoomSummary,
   UserInfo,
 } from './room.js';
 
@@ -21,6 +22,8 @@ export type PlayerActionName =
 
 export type WsClientEvent =
   | { type: 'ping'; requestId?: string }
+  /** Ask for the public directory of joinable tables. No session required. */
+  | { type: 'rooms:list' }
   | { type: 'session:resume'; token: string }
   | {
       type: 'room:create';
@@ -63,6 +66,7 @@ export type WsClientEvent =
 
 export type WsServerEvent =
   | { type: 'pong'; requestId?: string; ts: number }
+  | { type: 'rooms:listed'; rooms: RoomSummary[] }
   | { type: 'error'; code: string; message: string }
   | {
       type: 'session:resumed';

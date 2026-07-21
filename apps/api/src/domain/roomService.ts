@@ -112,6 +112,7 @@ export async function createRoom(input: {
     roomId,
     code,
     passwordHash,
+    hasPassword: input.password !== '',
     hostPlayerId: playerId,
     phase: 'LOBBY',
     config,

@@ -6,6 +6,7 @@ export type SerializedRoom = {
   roomId: string;
   code: string;
   passwordHash: string;
+  hasPassword?: boolean;
   hostPlayerId: string;
   phase: InternalRoom['phase'];
   config: InternalRoom['config'];
@@ -39,6 +40,7 @@ export function serializeRoom(room: InternalRoom): SerializedRoom {
     roomId: room.roomId,
     code: room.code,
     passwordHash: room.passwordHash,
+    hasPassword: room.hasPassword,
     hostPlayerId: room.hostPlayerId,
     phase: room.phase,
     config: room.config,
@@ -104,6 +106,8 @@ export function deserializeRoom(data: SerializedRoom): InternalRoom {
     roomId: data.roomId,
     code: data.code,
     passwordHash: data.passwordHash,
+    // Snapshots written before this field existed were all password-protected.
+    hasPassword: data.hasPassword ?? true,
     hostPlayerId: data.hostPlayerId,
     phase: data.phase,
     config: data.config,

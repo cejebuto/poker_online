@@ -4,6 +4,17 @@ export type PlayerRole = 'host' | 'player' | 'mesa';
 
 export type RoomPhase = 'LOBBY' | 'IN_HAND' | 'PAUSED' | 'CLOSED' | 'FINISHED';
 
+/** One row of the public table directory. Never carries secrets or player data. */
+export type RoomSummary = {
+  roomId: string;
+  code: string;
+  name: string;
+  players: number;
+  maxPlayers: number;
+  phase: RoomPhase;
+  hasPassword: boolean;
+};
+
 /** One tournament blind level. */
 export type BlindLevel = {
   smallBlind: number;
