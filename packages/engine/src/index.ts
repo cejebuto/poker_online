@@ -58,3 +58,12 @@ export type {
   ApplyResult,
   EngineError,
 } from './state/types.js';
+
+// Probability (client-side Monte Carlo; pure, no network)
+export {
+  estimateEquity,
+  exactRiverEquityVsOne,
+  iterationsForStreet,
+} from './probability/monteCarlo.js';
+export type { EquityInput, EquityResult } from './probability/monteCarlo.js';
+

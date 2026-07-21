@@ -7,6 +7,9 @@ import { env } from './config/env.js';
 import { checkPostgres, prisma } from './persistence/prisma.js';
 import { checkRedis, redis } from './cache/redis.js';
 import { attachWebSocket } from './ws/gateway.js';
+import { hydrateRoomsFromSnapshots } from './domain/hydrate.js';
+import { roomPubSub } from './cache/roomPubSub.js';
+import { listHandHistory } from './persistence/eventStore.js';
 
 async function bootstrap(): Promise<void> {
   const app = express();
@@ -35,11 +38,23 @@ async function bootstrap(): Promise<void> {
     });
   });
 
+  app.get('/rooms/:roomId/hands', async (req, res) => {
+    const hands = await listHandHistory(req.params.roomId ?? '');
+    res.json({ hands });
+  });
+
   const server = http.createServer(app);
   attachWebSocket(server);
 
   const postgresUp = await checkPostgres();
   const redisUp = await checkRedis();
+
+  if (postgresUp) {
+    await hydrateRoomsFromSnapshots();
+  }
+  if (redisUp) {
+    await roomPubSub.start();
+  }
 
   console.log(
     JSON.stringify({
@@ -65,6 +80,7 @@ async function bootstrap(): Promise<void> {
   const shutdown = async (signal: string) => {
     console.log(`[api] ${signal} received, shutting down`);
     server.close();
+    await roomPubSub.stop();
     redis.disconnect();
     await prisma.$disconnect();
     process.exit(0);

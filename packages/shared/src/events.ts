@@ -111,6 +111,18 @@ export type WsServerEvent =
       type: 'hand:result';
       winners: number[];
       payouts: Record<number, number>;
+    }
+  | {
+      type: 'timer:tick';
+      seat: number;
+      remainingMs: number;
+      timeBankMs: number;
+    }
+  | {
+      type: 'player:auto_acted';
+      seat: number;
+      action: PlayerActionName;
+      reason: 'timeout' | 'disconnect';
     };
 
 export type HealthResponse = {

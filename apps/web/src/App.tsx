@@ -139,20 +139,21 @@ export function App() {
   }, [role, screen]);
 
   useEffect(() => {
-    const handle = connectWs({ onStatus: setStatus, onEvent });
+    const handle = connectWs({
+      onStatus: setStatus,
+      onEvent,
+      onOpen: () => {
+        // Auto session:resume on every (re)connect with backoff
+        const session = loadSession();
+        if (session) {
+          resumeAttempted.current = true;
+          handle.send({ type: 'session:resume', token: session.token });
+        }
+      },
+    });
     wsRef.current = handle;
     return () => handle.close();
   }, [onEvent]);
-
-  // Auto-resume session
-  useEffect(() => {
-    if (status !== 'connected' || resumeAttempted.current) return;
-    const session = loadSession();
-    if (session) {
-      resumeAttempted.current = true;
-      wsRef.current?.send({ type: 'session:resume', token: session.token });
-    }
-  }, [status]);
 
   const send = (event: Parameters<WsHandle['send']>[0]) => {
     setError('');

@@ -19,10 +19,70 @@ model Room {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   closedAt     DateTime?
+  events       RoomEvent[]
+  snapshots    RoomSnapshot[]
+}
+
+/// Append-only event log (event sourcing).
+model RoomEvent {
+  id        String   @id @default(cuid())
+  roomId    String
+  handId    String?
+  version   Int
+  type      String
+  payload   Json
+  ts        DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, version])
+  @@index([roomId, ts])
+  @@index([handId])
+}
+
+/// Periodic snapshot of room hot state (JSON) for fast rebuild.
+model RoomSnapshot {
+  id        String   @id @default(cuid())
+  roomId    String
+  version   Int
+  phase     String
+  stateJson Json
+  ts        DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, version])
+}
+
+/// Idempotency keys for client actions.
+model ProcessedAction {
+  id             String   @id @default(cuid())
+  roomId         String
+  clientActionId String
+  handId         String?
+  resultJson     Json?
+  ts             DateTime @default(now())
+
+  @@unique([roomId, clientActionId])
+  @@index([roomId])
+}
+
+/// Closed-hand history for review UI.
+model HandHistory {
+  id         String   @id @default(cuid())
+  roomId     String
+  handId     String
+  button     Int
+  community  Json
+  payouts    Json
+  winners    Json
+  players    Json
+  closedAt   DateTime @default(now())
+
+  @@unique([roomId, handId])
+  @@index([roomId, closedAt])
 }
 
 model SchemaMeta {
   id        Int      @id @default(1)
-  version   String   @default("0.2.0")
+  version   String   @default("0.3.0")
   updatedAt DateTime @updatedAt
 }

@@ -1,6 +1,16 @@
+import { useState } from 'react';
 import type { PublicRoomState } from '@poker/shared';
 import { CommunityRow, PlayingCard } from '../cards/PlayingCard';
 import { useOrientation } from '../hooks/useOrientation';
+import { BettingPanel } from '../chips/BettingPanel';
+import { IsoChipStack } from '../chips/IsoChipStack';
+import { EquityBadge } from '../probability/EquityBadge';
+import {
+  loadEquityEnabled,
+  saveEquityEnabled,
+  useEquity,
+} from '../probability/useEquity';
+import { TurnTimer } from './TurnTimer';
 
 export function PlayerView({
   state,
@@ -17,11 +27,27 @@ export function PlayerView({
   const me = state.players.find((p) => p.playerId === playerId);
   const hand = state.hand;
   const mySeat = me?.seat ?? null;
-  const isMyTurn = hand?.currentToAct === mySeat && hand.phase !== 'COMPLETE';
+  const isMyTurn = Boolean(hand && hand.currentToAct === mySeat && hand.phase !== 'COMPLETE');
   const toCall = hand && me ? Math.max(0, hand.currentBet - (me.betThisRound ?? 0)) : 0;
   const potTotal =
     hand?.pots.reduce((s, p) => s + p.amount, 0) ??
     state.players.reduce((s, p) => s + (p.betThisRound ?? 0), 0);
+
+  /** Rivals still contesting — never their cards, only the count. */
+  const oppCount = hand
+    ? state.players.filter((p) => {
+        if (p.playerId === playerId || p.role === 'mesa' || p.seat === null) return false;
+        return p.status !== 'FOLDED';
+      }).length
+    : 0;
+
+  const [equityOn, setEquityOn] = useState(() => loadEquityEnabled());
+  const equity = useEquity({
+    hero: hand?.yourCards,
+    community: hand?.community ?? [],
+    opponents: oppCount,
+    enabled: equityOn && Boolean(hand?.yourCards?.length === 2) && oppCount >= 1,
+  });
 
   return (
     <section
@@ -38,9 +64,7 @@ export function PlayerView({
               Temas
             </button>
           ) : null}
-          <span className="meta">
-            Stack {me?.stack ?? 0} · {hand?.phase ?? '—'}
-          </span>
+          <span className="meta">{hand?.phase ?? '—'}</span>
         </div>
       </header>
 
@@ -48,10 +72,19 @@ export function PlayerView({
         <div className="zone community-zone">
           <p className="muted">Comunitarias</p>
           <CommunityRow cards={hand?.community ?? []} size="sm" />
-          <p className="meta">
-            Bote ~{potTotal} · mesa {hand?.currentBet ?? 0} · a pagar {toCall}
-            {isMyTurn ? ' · TU TURNO' : ''}
-          </p>
+          <div className="row pot-row">
+            <IsoChipStack amount={potTotal} compact label="Bote" />
+            <p className="meta">
+              mesa {hand?.currentBet ?? 0} · a pagar {toCall}
+              {isMyTurn ? ' · TU TURNO' : ''}
+            </p>
+          </div>
+          <TurnTimer
+            turnStartedAt={hand?.turnStartedAt}
+            turnTimeoutMs={hand?.turnTimeoutMs}
+            timeBankMs={hand?.actorTimeBankMs}
+            isMyTurn={isMyTurn}
+          />
         </div>
 
         <div className="zone holes-zone">
@@ -67,6 +100,17 @@ export function PlayerView({
               />
             ))}
           </div>
+          <IsoChipStack amount={me?.stack ?? 0} compact label="Tu stack" />
+          <EquityBadge
+            enabled={equityOn}
+            onToggle={(on) => {
+              setEquityOn(on);
+              saveEquityEnabled(on);
+            }}
+            result={equity.result}
+            calculating={equity.calculating}
+            error={equity.error}
+          />
         </div>
       </div>
 
@@ -77,38 +121,31 @@ export function PlayerView({
         </p>
       ) : null}
 
-      <div className="actions">
-        <button type="button" disabled={!isMyTurn} onClick={() => onAction('fold')}>
-          Fold
-        </button>
-        <button type="button" disabled={!isMyTurn || toCall > 0} onClick={() => onAction('check')}>
-          Check
-        </button>
-        <button type="button" disabled={!isMyTurn || toCall <= 0} onClick={() => onAction('call')}>
-          Call {toCall || ''}
-        </button>
-        <button
-          type="button"
-          disabled={!isMyTurn}
-          onClick={() => {
-            const raiseTo = (hand?.currentBet ?? 0) + Math.max(hand?.minRaise ?? 10, 10);
-            onAction(hand && hand.currentBet > 0 ? 'raise' : 'bet', Math.max(raiseTo, 10));
-          }}
-        >
-          Bet/Raise
-        </button>
-        <button type="button" disabled={!isMyTurn} onClick={() => onAction('all-in')}>
-          All-in
-        </button>
-      </div>
+      <BettingPanel
+        ctx={{
+          stack: me?.stack ?? 0,
+          toCall,
+          minRaise: hand?.minRaise ?? 10,
+          currentBet: hand?.currentBet ?? 0,
+          myBetThisRound: me?.betThisRound ?? 0,
+          canCheck: toCall === 0,
+          disabled: !isMyTurn,
+        }}
+        onConfirm={onAction}
+      />
 
       <ul className="player-list compact">
         {state.players.map((p) => (
           <li key={p.playerId} className={hand?.currentToAct === p.seat ? 'to-act' : ''}>
-            Asiento {p.seat}: {p.displayName} · {p.stack}
-            {p.status ? ` · ${p.status}` : ''}
-            {p.betThisRound ? ` · bet ${p.betThisRound}` : ''}
-            {hand?.currentToAct === p.seat ? ' ◀' : ''}
+            <span>
+              #{p.seat} {p.displayName}
+              {p.status ? ` · ${p.status}` : ''}
+              {hand?.currentToAct === p.seat ? ' ◀' : ''}
+            </span>
+            <IsoChipStack amount={p.stack} compact />
+            {p.betThisRound ? (
+              <span className="meta">bet {p.betThisRound}</span>
+            ) : null}
           </li>
         ))}
       </ul>

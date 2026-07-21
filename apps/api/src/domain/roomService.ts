@@ -7,10 +7,12 @@ import { roomRegistry } from './roomRegistry.js';
 import {
   DEFAULT_CONFIG,
   ROOM_DESTROY_GRACE_MS,
+  timeBankDefaultMs,
   type InternalPlayer,
   type InternalRoom,
 } from './types.js';
 import { prisma } from '../persistence/prisma.js';
+import { saveSnapshot } from '../persistence/eventStore.js';
 
 export type ServiceError = { code: string; message: string };
 
@@ -97,6 +99,9 @@ export async function createRoom(input: {
     seat: 0,
     stack: config.startingStack,
     connected: true,
+    connectionStatus: 'connected',
+    disconnectedAt: null,
+    timeBankMs: timeBankDefaultMs(config),
     connectionIds: new Set([input.connectionId]),
   };
 
@@ -110,12 +115,16 @@ export async function createRoom(input: {
     players: new Map([[playerId, player]]),
     version: 1,
     processedActionIds: new Set(),
+    actionResults: new Map(),
     emptySince: null,
     createdAt: Date.now(),
+    turnStartedAt: null,
+    turnSeat: null,
   };
 
   roomRegistry.set(room);
   await persistRoomMeta(room);
+  await saveSnapshot(room);
 
   const token = signSession({
     playerId,
@@ -155,6 +164,9 @@ export async function joinRoom(input: {
       seat: null,
       stack: 0,
       connected: true,
+      connectionStatus: 'connected',
+      disconnectedAt: null,
+      timeBankMs: 0,
       connectionIds: new Set([input.connectionId]),
     };
     room.players.set(playerId, player);
@@ -182,6 +194,9 @@ export async function joinRoom(input: {
     seat,
     stack: room.config.startingStack,
     connected: true,
+    connectionStatus: 'connected',
+    disconnectedAt: null,
+    timeBankMs: timeBankDefaultMs(room.config),
     connectionIds: new Set([input.connectionId]),
   };
   room.players.set(playerId, player);
@@ -207,6 +222,11 @@ export function attachConnection(
   if (!player) fail('PLAYER_NOT_FOUND', 'Player not in room');
   player.connectionIds.add(connectionId);
   player.connected = true;
+  // Reconnect: leave sitting_out until host re-seats? Spec: recover seat and cards.
+  if (player.connectionStatus === 'disconnected' || player.connectionStatus === 'sitting_out') {
+    player.connectionStatus = 'connected';
+  }
+  player.disconnectedAt = null;
   room.emptySince = null;
   room.version += 1;
   return player;
@@ -224,6 +244,10 @@ export function detachConnection(
   player.connectionIds.delete(connectionId);
   if (player.connectionIds.size === 0) {
     player.connected = false;
+    if (player.role !== 'mesa') {
+      player.connectionStatus = 'disconnected';
+      player.disconnectedAt = Date.now();
+    }
   }
   room.version += 1;
   scheduleDestroyIfEmpty(room);
@@ -305,6 +329,7 @@ function scheduleDestroyIfEmpty(room: InternalRoom): void {
         });
       }
     }, ROOM_DESTROY_GRACE_MS);
+    t.unref?.();
     destroyTimers.set(room.roomId, t);
   } else {
     room.emptySince = null;

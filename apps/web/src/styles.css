@@ -347,6 +347,239 @@ button.small {
   font-size: 1rem;
 }
 
+/* —— Chips (isometric + bars) —— */
+.iso-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.iso-stack.compact .iso-amount {
+  font-size: 0.75rem;
+}
+
+.iso-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.iso-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+}
+
+.iso-amount {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.chip-column {
+  position: relative;
+  width: 2rem;
+  height: 2.4rem;
+}
+
+.iso-chip {
+  position: absolute;
+  left: 0;
+  width: 2rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  border: 2px solid;
+  transform: rotateX(50deg) rotateZ(-15deg);
+  display: grid;
+  place-items: center;
+}
+
+.iso-chip-value {
+  font-size: 0.55rem;
+  font-weight: 800;
+  transform: rotateZ(15deg);
+}
+
+.chip-bar {
+  min-width: 2.6rem;
+  border-radius: 0.35rem;
+  background: linear-gradient(160deg, #334155, #1e293b);
+  border: 1px solid #64748b;
+  padding: 0.35rem 0.4rem;
+  box-shadow: 2px 3px 0 #0f172a;
+}
+
+.chip-bar-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.chip-bar-count {
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.chip-bar-mult {
+  font-size: 0.65rem;
+  color: #fbbf24;
+}
+
+.denom-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
+}
+
+.denom-chip {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 2px solid;
+  font-weight: 800;
+  font-size: 0.75rem;
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.35);
+}
+
+.denom-chip.active {
+  outline: 2px solid #22c55e;
+  outline-offset: 2px;
+}
+
+.betting-panel {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #334155;
+}
+
+.betting-panel.disabled {
+  opacity: 0.55;
+}
+
+.gesture-pad {
+  margin: 0.45rem 0;
+  padding: 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px dashed #64748b;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  touch-action: none;
+  user-select: none;
+  background: #0f172a;
+}
+
+.throw-pad {
+  border-color: #22c55e;
+  color: #86efac;
+}
+
+.hold-pad {
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+
+.bet-actions {
+  margin-top: 0.35rem;
+}
+
+.bet-confirm {
+  margin: 0.5rem 0;
+}
+
+.muted.small,
+.meta.small {
+  font-size: 0.75rem;
+}
+
+.pot-row {
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.player-list.compact li {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Equity (Monte Carlo — client only) */
+.equity-badge {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.65rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.equity-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.equity-nums {
+  display: flex;
+  gap: 0.65rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.equity-win {
+  color: #4ade80;
+}
+
+.equity-tie {
+  color: #fbbf24;
+}
+
+.equity-calc {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.turn-timer {
+  margin-top: 0.4rem;
+  width: 100%;
+}
+
+.turn-timer-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #1e293b;
+  overflow: hidden;
+  border: 1px solid #334155;
+}
+
+.turn-timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #eab308);
+  transition: width 0.2s linear;
+}
+
+.turn-timer.bank .turn-timer-fill {
+  background: linear-gradient(90deg, #f97316, #ef4444);
+}
+
+.turn-timer.mine .turn-timer-bar {
+  border-color: #22c55e;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

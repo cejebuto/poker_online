@@ -16,6 +16,7 @@ import {
   updateConfig,
 } from '../domain/roomService.js';
 import { applyPlayerAction, startRoomHand } from '../domain/handService.js';
+import { scheduleDisconnectWatch } from '../domain/timerService.js';
 import type { ClientSession } from './hub.js';
 import { hub } from './hub.js';
 
@@ -339,8 +340,11 @@ function emitHandBroadcast(
 
 export function onDisconnect(session: ClientSession): void {
   if (session.roomId && session.playerId) {
-    detachConnection(session.roomId, session.playerId, session.connectionId);
-    broadcastSnapshots(session.roomId);
+    const roomId = session.roomId;
+    const playerId = session.playerId;
+    detachConnection(roomId, playerId, session.connectionId);
+    scheduleDisconnectWatch(roomId, playerId);
+    broadcastSnapshots(roomId);
   }
   hub.remove(session.connectionId);
 }

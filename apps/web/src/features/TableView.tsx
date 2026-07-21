@@ -1,5 +1,6 @@
 import type { PublicRoomState } from '@poker/shared';
 import { CommunityRow } from '../cards/PlayingCard';
+import { IsoChipStack } from '../chips/IsoChipStack';
 
 /** Mesa device: public info only, large community cards. Never private holes. */
 export function TableView({
@@ -26,9 +27,9 @@ export function TableView({
 
       <div className="mesa-center">
         <CommunityRow cards={hand?.community ?? []} size="lg" />
-        <p className={`pot ${hand?.phase === 'COMPLETE' ? 'card-anim-reveal' : ''}`}>
-          Bote: {pot || '—'}
-        </p>
+        <div className={hand?.phase === 'COMPLETE' ? 'card-anim-reveal' : ''}>
+          <IsoChipStack amount={pot} label="Bote" />
+        </div>
         <p className="meta">Fase: {hand?.phase ?? state.phase}</p>
       </div>
 
@@ -40,12 +41,12 @@ export function TableView({
           >
             <strong>
               {p.displayName} (#{p.seat})
-            </strong>
-            <span>
-              {p.stack} fichas
-              {p.betThisRound ? ` · apuesta ${p.betThisRound}` : ''}
               {p.status ? ` · ${p.status}` : ''}
-            </span>
+            </strong>
+            <IsoChipStack amount={p.stack} compact />
+            {p.betThisRound ? (
+              <IsoChipStack amount={p.betThisRound} compact label="Apuesta" />
+            ) : null}
           </li>
         ))}
       </ul>

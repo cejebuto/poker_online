@@ -1,8 +1,13 @@
 import type { Card, PublicPlayer, PublicRoomState } from '@poker/shared';
 import type { InternalPlayer, InternalRoom } from './types.js';
+import { turnTimeoutMs } from './types.js';
 import { env } from '../config/env.js';
 
 function toPublicPlayer(p: InternalPlayer): PublicPlayer {
+  let status: PublicPlayer['status'];
+  if (p.connectionStatus === 'sitting_out') status = 'SITTING_OUT';
+  else if (p.connectionStatus === 'disconnected') status = 'DISCONNECTED';
+
   return {
     playerId: p.playerId,
     displayName: p.displayName,
@@ -11,6 +16,8 @@ function toPublicPlayer(p: InternalPlayer): PublicPlayer {
     seat: p.seat,
     stack: p.stack,
     connected: p.connected,
+    ...(status ? { status } : {}),
+    timeBankMs: p.timeBankMs,
   };
 }
 
@@ -27,13 +34,17 @@ export function toPublicRoomState(
     .map(toPublicPlayer)
     .sort((a, b) => (a.seat ?? 99) - (b.seat ?? 99));
 
-  // Overlay hand betting info onto players
   if (room.hand) {
     for (const hp of room.hand.players) {
       const pub = players.find((p) => p.seat === hp.seat);
       if (pub) {
         pub.stack = hp.stack;
-        pub.status = hp.status;
+        // Hand status overrides disconnect display for folded/all-in
+        if (hp.status === 'FOLDED' || hp.status === 'ALL_IN') {
+          pub.status = hp.status;
+        } else if (!pub.status || pub.status === 'DISCONNECTED') {
+          pub.status = hp.status;
+        }
         pub.betThisRound = hp.betThisRound;
       }
     }
@@ -61,6 +72,10 @@ export function toPublicRoomState(
         if (hp) yourCards = hp.holeCards.map((c) => ({ ...c }));
       }
     }
+    const actor =
+      room.hand.currentToAct !== null
+        ? [...room.players.values()].find((p) => p.seat === room.hand!.currentToAct)
+        : undefined;
     state.hand = {
       handId: room.hand.handId,
       phase: room.hand.phase,
@@ -74,6 +89,9 @@ export function toPublicRoomState(
       minRaise: room.hand.minRaise,
       button: room.hand.button,
       ...(yourCards ? { yourCards } : {}),
+      ...(room.turnStartedAt ? { turnStartedAt: room.turnStartedAt } : {}),
+      turnTimeoutMs: turnTimeoutMs(room.config),
+      ...(actor ? { actorTimeBankMs: actor.timeBankMs } : {}),
     };
     if (room.hand.phase === 'COMPLETE' && Object.keys(room.hand.payouts).length) {
       const winners = Object.entries(room.hand.payouts)
@@ -99,8 +117,6 @@ export function findPrivateLeaks(payload: unknown, viewerPlayerId?: string): str
   if (raw.includes('"deck"')) {
     leaks.push('deck');
   }
-  // Hole cards of others shouldn't appear under foreign player objects
-  // yourCards is OK for viewer
   if (typeof payload === 'object' && payload !== null) {
     walk(payload, '', leaks, viewerPlayerId);
   }
@@ -118,9 +134,6 @@ function walk(node: unknown, path: string, leaks: string[], viewer?: string): vo
     const p = path ? `${path}.${k}` : k;
     if (k === 'holeCards' || k === 'deck' || k === 'passwordHash' || k === 'password') {
       leaks.push(p);
-    }
-    if (k === 'yourCards' && viewer === undefined) {
-      // allowed only when viewer-specific; generic broadcast shouldn't have it
     }
     walk(v, p, leaks, viewer);
   }

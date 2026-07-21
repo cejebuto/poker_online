@@ -5,6 +5,8 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 export type WsClientHandlers = {
   onStatus: (status: ConnectionStatus) => void;
   onEvent?: (event: WsServerEvent) => void;
+  /** Called after each successful (re)connect — use to send session:resume. */
+  onOpen?: () => void;
 };
 
 export type WsHandle = {
@@ -46,6 +48,7 @@ export function connectWs(handlers: WsClientHandlers): WsHandle {
     socket.addEventListener('open', () => {
       retryMs = 500;
       handlers.onStatus('connected');
+      handlers.onOpen?.();
       flush();
     });
 

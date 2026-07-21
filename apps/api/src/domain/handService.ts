@@ -9,21 +9,31 @@ import {
 import type { Card } from '@poker/shared';
 import type { InternalRoom } from './types.js';
 import { newId } from './ids.js';
+import {
+  appendDomainEvents,
+  markProcessedAction,
+  saveHandHistory,
+  saveSnapshot,
+} from '../persistence/eventStore.js';
+import {
+  clearTurnTimer,
+  onTurnConsumedBank,
+  rechargeTimeBanks,
+  scheduleTurnTimer,
+} from './timerService.js';
 
 export type HandBroadcast = {
-  /** Domain events for logging / projection. */
   domainEvents: DomainEvent[];
-  /** Per-player private deal. */
   deals: { playerId: string; cards: Card[] }[];
-  /** Public community update if any. */
   community?: { cards: Card[]; phase: string };
   turn?: { seat: number };
   acted?: { seat: number; action: ActionType; amount: number };
   pots?: { amount: number; eligibleSeats: number[] }[];
   showdown?: { hands: { seat: number; cards: Card[] }[] };
   result?: { winners: number[]; payouts: Record<number, number> };
-  /** True when hand finished (COMPLETE). */
   handComplete: boolean;
+  /** True when this was an idempotent replay (no state change). */
+  idempotent?: boolean;
 };
 
 function fail(code: string, message: string): never {
@@ -97,7 +107,6 @@ function extractFromDomain(
     }));
   }
 
-  // Showdown reveal only when showdown happened (not fold-out)
   if (events.some((e) => e.type === 'showdown:resolved')) {
     out.showdown = {
       hands: hand.players
@@ -109,16 +118,43 @@ function extractFromDomain(
   return out;
 }
 
+async function persistTransitions(
+  room: InternalRoom,
+  events: DomainEvent[],
+  handId: string | undefined,
+  complete: boolean,
+): Promise<void> {
+  await appendDomainEvents(room, events, handId);
+  if (complete) {
+    await saveHandHistory(room);
+    await saveSnapshot(room);
+    rechargeTimeBanks(room);
+  }
+}
+
+function afterTurnChange(room: InternalRoom): void {
+  if (room.hand && room.hand.phase !== 'COMPLETE' && room.hand.currentToAct !== null) {
+    scheduleTurnTimer(room);
+  } else {
+    clearTurnTimer(room);
+    room.turnStartedAt = null;
+    room.turnSeat = null;
+  }
+}
+
 export function startRoomHand(room: InternalRoom): HandBroadcast {
   if (room.phase === 'IN_HAND' && room.hand && room.hand.phase !== 'COMPLETE') {
     fail('HAND_IN_PROGRESS', 'A hand is already in progress');
   }
   const seated = [...room.players.values()].filter(
-    (p) => p.role !== 'mesa' && p.seat !== null && p.stack > 0,
+    (p) =>
+      p.role !== 'mesa' &&
+      p.seat !== null &&
+      p.stack > 0 &&
+      p.connectionStatus !== 'sitting_out',
   );
   if (seated.length < 2) fail('NOT_ENOUGH_PLAYERS', 'Need at least 2 players with chips');
 
-  // Rotate button from previous hand or start at host seat
   let button = room.hand?.button ?? seated[0]!.seat!;
   if (room.hand?.phase === 'COMPLETE') {
     const seats = seated.map((p) => p.seat!).sort((a, b) => a - b);
@@ -143,16 +179,25 @@ export function startRoomHand(room: InternalRoom): HandBroadcast {
   );
   if (!result.ok) fail(result.error.code, result.error.message);
 
+  clearTurnTimer(room);
   room.hand = result.value.state;
   room.phase = result.value.state.phase === 'COMPLETE' ? 'LOBBY' : 'IN_HAND';
-  room.version += 1;
   room.processedActionIds.clear();
+  room.actionResults.clear();
   syncStacksFromHand(room, room.hand);
 
   const broadcast = extractFromDomain(room, room.hand, result.value.events);
   if (room.hand.phase === 'COMPLETE') {
     room.phase = 'LOBBY';
   }
+
+  void persistTransitions(
+    room,
+    result.value.events,
+    room.hand.handId,
+    room.hand.phase === 'COMPLETE',
+  );
+  afterTurnChange(room);
   return broadcast;
 }
 
@@ -166,24 +211,39 @@ export function applyPlayerAction(
     clientActionId: string;
   },
 ): HandBroadcast {
-  if (!room.hand || room.hand.phase === 'COMPLETE') {
-    fail('NO_HAND', 'No active hand');
-  }
-  if (room.hand.handId !== input.handId) {
-    fail('WRONG_HAND', 'handId does not match active hand');
-  }
+  // Idempotency first — even if the hand already completed after this action
   if (room.processedActionIds.has(input.clientActionId)) {
-    // Idempotent: return empty broadcast (caller can re-send snapshot)
+    const cached = room.actionResults.get(input.clientActionId) as HandBroadcast | undefined;
+    if (cached) return { ...cached, idempotent: true, domainEvents: [] };
     return {
       domainEvents: [],
       deals: [],
-      handComplete: false,
+      handComplete: true,
+      idempotent: true,
     };
+  }
+
+  if (!room.hand) {
+    fail('NO_HAND', 'No active hand');
+  }
+  const activeHand = room.hand;
+  if (activeHand.phase === 'COMPLETE') {
+    fail('NO_HAND', 'No active hand');
+  }
+  if (activeHand.handId !== input.handId) {
+    fail('WRONG_HAND', 'handId does not match active hand');
   }
 
   const player = room.players.get(input.playerId);
   if (!player || player.seat === null || player.role === 'mesa') {
     fail('FORBIDDEN', 'Not a seated player');
+  }
+  if (player.connectionStatus === 'sitting_out') {
+    fail('SITTING_OUT', 'Player is sitting out');
+  }
+
+  if (room.turnStartedAt && room.turnSeat === player.seat) {
+    onTurnConsumedBank(room, player.seat, Date.now() - room.turnStartedAt);
   }
 
   const engineAction = {
@@ -192,17 +252,38 @@ export function applyPlayerAction(
     ...(input.amount !== undefined ? { amount: input.amount } : {}),
   };
 
-  const result = applyAction(room.hand, engineAction);
+  const result = applyAction(activeHand, engineAction);
   if (!result.ok) fail(result.error.code, result.error.message);
 
+  clearTurnTimer(room);
   room.hand = result.value.state;
   room.processedActionIds.add(input.clientActionId);
-  room.version += 1;
   syncStacksFromHand(room, room.hand);
 
   const broadcast = extractFromDomain(room, room.hand, result.value.events);
-  if (room.hand.phase === 'COMPLETE') {
+  room.actionResults.set(input.clientActionId, {
+    domainEvents: [],
+    deals: broadcast.deals,
+    community: broadcast.community,
+    acted: broadcast.acted,
+    pots: broadcast.pots,
+    showdown: broadcast.showdown,
+    result: broadcast.result,
+    handComplete: broadcast.handComplete,
+  });
+
+  const completed = room.hand.phase === 'COMPLETE';
+  if (completed) {
     room.phase = 'LOBBY';
   }
+
+  void persistTransitions(room, result.value.events, room.hand.handId, completed);
+  void markProcessedAction(
+    room.roomId,
+    input.clientActionId,
+    room.hand.handId,
+    room.actionResults.get(input.clientActionId),
+  );
+  afterTurnChange(room);
   return broadcast;
 }

@@ -16,9 +16,9 @@ Guía de **0 a 100** para construir la app. Cada documento es una **fase** con o
 | [`03-fase2-backend-salas-privadas_ok.md`](./03-fase2-backend-salas-privadas_ok.md) ✅ | Fase 2 | Backend WebSocket, salas privadas (password 6 letras), JWT, lobby. |
 | [`04-fase3-flujo-mano-protocolo_ok.md`](./04-fase3-flujo-mano-protocolo_ok.md) ✅ | Fase 3 | Máquina de estados de la mano en el servidor + protocolo WS completo. |
 | [`05-fase4-frontend-cartas-svg_ok.md`](./05-fase4-frontend-cartas-svg_ok.md) ✅ | Fase 4 | Frontend jugador + mesa, sistema de cartas SVG reusable con temas. |
-| [`06-fase5-fichas-ux.md`](./06-fase5-fichas-ux.md) | Fase 5 | Las 4 formas de apostar, fichas isométricas + barras, orientación. |
-| [`07-fase6-probabilidad.md`](./07-fase6-probabilidad.md) | Fase 6 | Motor Monte Carlo de probabilidad en el cliente (Web Worker). |
-| [`08-fase7-resiliencia-persistencia.md`](./08-fase7-resiliencia-persistencia.md) | Fase 7 | Event sourcing, reconexión con JWT, timers/time bank, colas. |
+| [`06-fase5-fichas-ux_ok.md`](./06-fase5-fichas-ux_ok.md) ✅ | Fase 5 | Las 4 formas de apostar, fichas isométricas + barras, orientación. |
+| [`07-fase6-probabilidad_ok.md`](./07-fase6-probabilidad_ok.md) ✅ | Fase 6 | Motor Monte Carlo de probabilidad en el cliente (Web Worker). |
+| [`08-fase7-resiliencia-persistencia_ok.md`](./08-fase7-resiliencia-persistencia_ok.md) ✅ | Fase 7 | Event sourcing, reconexión con JWT, timers/time bank, colas. |
 | [`09-fase8-modalidades-seguridad.md`](./09-fase8-modalidades-seguridad.md) | Fase 8 | Cash game / torneo configurable + endurecimiento de seguridad media. |
 | [`10-fase9-qa-despliegue.md`](./10-fase9-qa-despliegue.md) | Fase 9 | Pruebas e2e, criterios de aceptación finales, despliegue dockerizado. |
 
