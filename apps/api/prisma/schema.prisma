@@ -7,10 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Placeholder model so Prisma can generate a client and run an initial migration.
-/// Real event-store models land in later phases.
+/// Durable room metadata (hot play state lives in memory/Redis).
+model Room {
+  id           String    @id
+  code         String    @unique
+  passwordHash String
+  hostPlayerId String
+  phase        String    @default("LOBBY")
+  config       Json
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  closedAt     DateTime?
+}
+
 model SchemaMeta {
   id        Int      @id @default(1)
-  version   String   @default("0.1.0")
+  version   String   @default("0.2.0")
   updatedAt DateTime @updatedAt
 }

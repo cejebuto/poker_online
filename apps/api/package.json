@@ -17,6 +17,7 @@
     "@poker/engine": "workspace:*",
     "@poker/shared": "workspace:*",
     "@prisma/client": "^6.8.2",
+    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
@@ -24,6 +25,7 @@
     "ws": "^8.18.2"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.21",

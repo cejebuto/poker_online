@@ -12,9 +12,9 @@ Guía de **0 a 100** para construir la app. Cada documento es una **fase** con o
 |-----|------|-----------|
 | [`00-fundamentos-y-arquitectura_ok.md`](./00-fundamentos-y-arquitectura_ok.md) ✅ | Fundamentos | Estructura del monorepo, convenciones de código limpio, sistema de temas de cartas, criterios transversales. |
 | [`01-fase0-setup-docker_ok.md`](./01-fase0-setup-docker_ok.md) ✅ | Fase 0 | Scaffolding + Docker + docker-compose (Postgres, Redis) + CI. |
-| [`02-fase1-core-engine.md`](./02-fase1-core-engine.md) | Fase 1 | Motor de poker puro (mazo, evaluador, apuestas, side pots) con tests. |
-| [`03-fase2-backend-salas-privadas.md`](./03-fase2-backend-salas-privadas.md) | Fase 2 | Backend WebSocket, salas privadas (password 6 letras), JWT, lobby. |
-| [`04-fase3-flujo-mano-protocolo.md`](./04-fase3-flujo-mano-protocolo.md) | Fase 3 | Máquina de estados de la mano en el servidor + protocolo WS completo. |
+| [`02-fase1-core-engine_ok.md`](./02-fase1-core-engine_ok.md) ✅ | Fase 1 | Motor de poker puro (mazo, evaluador, apuestas, side pots) con tests. |
+| [`03-fase2-backend-salas-privadas_ok.md`](./03-fase2-backend-salas-privadas_ok.md) ✅ | Fase 2 | Backend WebSocket, salas privadas (password 6 letras), JWT, lobby. |
+| [`04-fase3-flujo-mano-protocolo_ok.md`](./04-fase3-flujo-mano-protocolo_ok.md) ✅ | Fase 3 | Máquina de estados de la mano en el servidor + protocolo WS completo. |
 | [`05-fase4-frontend-cartas-svg.md`](./05-fase4-frontend-cartas-svg.md) | Fase 4 | Frontend jugador + mesa, sistema de cartas SVG reusable con temas. |
 | [`06-fase5-fichas-ux.md`](./06-fase5-fichas-ux.md) | Fase 5 | Las 4 formas de apostar, fichas isométricas + barras, orientación. |
 | [`07-fase6-probabilidad.md`](./07-fase6-probabilidad.md) | Fase 6 | Motor Monte Carlo de probabilidad en el cliente (Web Worker). |

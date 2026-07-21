@@ -15,12 +15,14 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
+    "test:coverage": "node --import tsx --test --experimental-test-coverage test/**/*.test.ts",
     "dev": "tsc -p tsconfig.json --watch"
   },
   "dependencies": {
     "@poker/shared": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^22.15.21",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }

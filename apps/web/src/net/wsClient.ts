@@ -7,14 +7,17 @@ export type WsClientHandlers = {
   onEvent?: (event: WsServerEvent) => void;
 };
 
+export type WsHandle = {
+  send: (event: WsClientEvent) => void;
+  close: () => void;
+};
+
 function resolveWsUrl(): string {
   const fromEnv = import.meta.env.VITE_WS_URL as string | undefined;
   if (fromEnv) return fromEnv;
 
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.hostname;
-  // In docker compose, web is served via nginx that proxies /ws to api.
-  // Local vite dev hits the api port directly.
   if (import.meta.env.DEV) {
     const apiPort = (import.meta.env.VITE_API_PORT as string | undefined) ?? '3001';
     return `${proto}://${host}:${apiPort}/ws`;
@@ -22,11 +25,19 @@ function resolveWsUrl(): string {
   return `${proto}://${window.location.host}/ws`;
 }
 
-export function connectWs(handlers: WsClientHandlers): () => void {
+export function connectWs(handlers: WsClientHandlers): WsHandle {
   let socket: WebSocket | null = null;
   let closedByUser = false;
   let retryMs = 500;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const queue: WsClientEvent[] = [];
+
+  const flush = () => {
+    while (socket?.readyState === WebSocket.OPEN && queue.length) {
+      const ev = queue.shift()!;
+      socket.send(JSON.stringify(ev));
+    }
+  };
 
   const connect = () => {
     handlers.onStatus('connecting');
@@ -35,8 +46,7 @@ export function connectWs(handlers: WsClientHandlers): () => void {
     socket.addEventListener('open', () => {
       retryMs = 500;
       handlers.onStatus('connected');
-      const ping: WsClientEvent = { type: 'ping', requestId: 'hello' };
-      socket?.send(JSON.stringify(ping));
+      flush();
     });
 
     socket.addEventListener('message', (msg) => {
@@ -44,7 +54,7 @@ export function connectWs(handlers: WsClientHandlers): () => void {
         const event = JSON.parse(String(msg.data)) as WsServerEvent;
         handlers.onEvent?.(event);
       } catch {
-        // ignore malformed
+        // ignore
       }
     });
 
@@ -63,9 +73,18 @@ export function connectWs(handlers: WsClientHandlers): () => void {
 
   connect();
 
-  return () => {
-    closedByUser = true;
-    if (timer) clearTimeout(timer);
-    socket?.close();
+  return {
+    send: (event) => {
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(event));
+      } else {
+        queue.push(event);
+      }
+    },
+    close: () => {
+      closedByUser = true;
+      if (timer) clearTimeout(timer);
+      socket?.close();
+    },
   };
 }

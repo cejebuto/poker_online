@@ -1,0 +1,346 @@
+import type { WsClientEvent, WsServerEvent } from '@poker/shared';
+import type { ActionType } from '@poker/engine';
+import { verifySession } from '../auth/jwt.js';
+import { roomLocks } from '../domain/lock.js';
+import { roomRegistry } from '../domain/roomRegistry.js';
+import { toPublicRoomState } from '../domain/publicState.js';
+import {
+  attachConnection,
+  createRoom,
+  detachConnection,
+  getServiceError,
+  joinRoom,
+  kickPlayer,
+  leaveRoom,
+  reorderSeats,
+  updateConfig,
+} from '../domain/roomService.js';
+import { applyPlayerAction, startRoomHand } from '../domain/handService.js';
+import type { ClientSession } from './hub.js';
+import { hub } from './hub.js';
+
+function error(code: string, message: string): WsServerEvent {
+  return { type: 'error', code, message };
+}
+
+function snapshotFor(roomId: string, playerId: string | null): WsServerEvent | null {
+  const room = roomRegistry.get(roomId);
+  if (!room) return null;
+  return {
+    type: 'state:snapshot',
+    roomState: toPublicRoomState(room, playerId),
+  };
+}
+
+function broadcastSnapshots(roomId: string): void {
+  hub.broadcastMap(roomId, (session) => {
+    if (!session.playerId) return null;
+    return snapshotFor(roomId, session.playerId);
+  });
+}
+
+export async function handleClientEvent(
+  session: ClientSession,
+  event: WsClientEvent,
+): Promise<void> {
+  try {
+    switch (event.type) {
+      case 'ping':
+        hub.send(session.connectionId, {
+          type: 'pong',
+          requestId: event.requestId,
+          ts: Date.now(),
+        });
+        return;
+
+      case 'session:resume': {
+        const claims = verifySession(event.token);
+        if (!claims) {
+          hub.send(session.connectionId, error('INVALID_TOKEN', 'Invalid or expired session'));
+          return;
+        }
+        const room = roomRegistry.get(claims.roomId);
+        if (!room || room.phase === 'CLOSED') {
+          hub.send(session.connectionId, error('ROOM_NOT_FOUND', 'Room no longer exists'));
+          return;
+        }
+        if (!room.players.has(claims.playerId)) {
+          hub.send(session.connectionId, error('PLAYER_NOT_FOUND', 'Player not in room'));
+          return;
+        }
+        await roomLocks.withLock(room.roomId, () => {
+          attachConnection(room, claims.playerId, session.connectionId);
+        });
+        session.playerId = claims.playerId;
+        session.roomId = claims.roomId;
+        session.role = claims.role;
+        hub.send(session.connectionId, {
+          type: 'session:resumed',
+          roomId: claims.roomId,
+          playerId: claims.playerId,
+          role: claims.role,
+        });
+        const snap = snapshotFor(claims.roomId, claims.playerId);
+        if (snap) hub.send(session.connectionId, snap);
+        // re-deal private cards if hand active
+        const r = roomRegistry.get(claims.roomId);
+        if (r?.hand && claims.role !== 'mesa') {
+          const player = r.players.get(claims.playerId);
+          if (player?.seat !== null && player) {
+            const hp = r.hand.players.find((p) => p.seat === player.seat);
+            if (hp) {
+              hub.send(session.connectionId, {
+                type: 'hand:dealt',
+                yourCards: hp.holeCards.map((c) => ({ ...c })),
+              });
+            }
+          }
+        }
+        return;
+      }
+
+      case 'room:create': {
+        const result = await createRoom({
+          password: event.password,
+          user: event.user,
+          config: event.config,
+          connectionId: session.connectionId,
+        });
+        session.playerId = result.player.playerId;
+        session.roomId = result.room.roomId;
+        session.role = 'host';
+        hub.send(session.connectionId, {
+          type: 'room:created',
+          roomId: result.room.roomId,
+          code: result.room.code,
+          joinUrl: result.joinUrl,
+          qrPayload: result.qrPayload,
+          token: result.token,
+          playerId: result.player.playerId,
+        });
+        const snap = snapshotFor(result.room.roomId, result.player.playerId);
+        if (snap) hub.send(session.connectionId, snap);
+        return;
+      }
+
+      case 'room:join':
+      case 'mesa:attach': {
+        const asMesa = event.type === 'mesa:attach';
+        const result = await joinRoom({
+          roomId: event.roomId,
+          code: event.code,
+          password: event.password,
+          user: asMesa ? { displayName: 'Mesa' } : event.type === 'room:join' ? event.user : { displayName: 'Mesa' },
+          connectionId: session.connectionId,
+          asMesa,
+        });
+        session.playerId = result.player.playerId;
+        session.roomId = result.room.roomId;
+        session.role = result.player.role;
+        hub.send(session.connectionId, {
+          type: 'room:joined',
+          roomId: result.room.roomId,
+          code: result.room.code,
+          token: result.token,
+          playerId: result.player.playerId,
+          role: result.player.role,
+        });
+        if (!asMesa) {
+          hub.broadcast(result.room.roomId, {
+            type: 'player:joined',
+            player: {
+              playerId: result.player.playerId,
+              displayName: result.player.displayName,
+              ...(result.player.avatar ? { avatar: result.player.avatar } : {}),
+              role: result.player.role,
+              seat: result.player.seat,
+              stack: result.player.stack,
+              connected: true,
+            },
+          });
+        }
+        broadcastSnapshots(result.room.roomId);
+        return;
+      }
+
+      case 'room:config:update': {
+        if (!session.roomId || !session.playerId) {
+          hub.send(session.connectionId, error('UNAUTHORIZED', 'Not in a room'));
+          return;
+        }
+        await roomLocks.withLock(session.roomId, () => {
+          const room = roomRegistry.get(session.roomId!);
+          if (!room) failNotFound();
+          updateConfig(room, session.playerId!, event.patch);
+        });
+        broadcastSnapshots(session.roomId);
+        return;
+      }
+
+      case 'room:seats:reorder': {
+        if (!session.roomId || !session.playerId) {
+          hub.send(session.connectionId, error('UNAUTHORIZED', 'Not in a room'));
+          return;
+        }
+        await roomLocks.withLock(session.roomId, () => {
+          const room = roomRegistry.get(session.roomId!);
+          if (!room) failNotFound();
+          reorderSeats(room, session.playerId!, event.seatOrder);
+        });
+        broadcastSnapshots(session.roomId);
+        return;
+      }
+
+      case 'player:kick': {
+        if (!session.roomId || !session.playerId) {
+          hub.send(session.connectionId, error('UNAUTHORIZED', 'Not in a room'));
+          return;
+        }
+        let kickedId = '';
+        await roomLocks.withLock(session.roomId, () => {
+          const room = roomRegistry.get(session.roomId!);
+          if (!room) failNotFound();
+          const target = kickPlayer(room, session.playerId!, event.playerId);
+          kickedId = target.playerId;
+        });
+        hub.broadcast(session.roomId, { type: 'player:kicked', playerId: kickedId });
+        hub.broadcastMap(session.roomId, (s) => {
+          if (s.playerId === kickedId) {
+            hub.send(s.connectionId, error('KICKED', 'You were kicked from the room'));
+            s.roomId = undefined;
+            s.playerId = undefined;
+            s.role = undefined;
+          }
+          return null;
+        });
+        broadcastSnapshots(session.roomId);
+        return;
+      }
+
+      case 'player:leave': {
+        if (!session.roomId || !session.playerId) return;
+        const roomId = session.roomId;
+        const playerId = session.playerId;
+        await roomLocks.withLock(roomId, () => {
+          const room = roomRegistry.get(roomId);
+          if (!room) return;
+          leaveRoom(room, playerId);
+        });
+        hub.broadcast(roomId, { type: 'player:left', playerId });
+        session.roomId = undefined;
+        session.playerId = undefined;
+        session.role = undefined;
+        broadcastSnapshots(roomId);
+        return;
+      }
+
+      case 'hand:start': {
+        if (!session.roomId || !session.playerId) {
+          hub.send(session.connectionId, error('UNAUTHORIZED', 'Not in a room'));
+          return;
+        }
+        await roomLocks.withLock(session.roomId, async () => {
+          const room = roomRegistry.get(session.roomId!);
+          if (!room) failNotFound();
+          if (room.hostPlayerId !== session.playerId) {
+            hub.send(session.connectionId, error('FORBIDDEN', 'Only host can start hand'));
+            return;
+          }
+          const bc = startRoomHand(room);
+          emitHandBroadcast(room.roomId, bc);
+        });
+        return;
+      }
+
+      case 'player:action': {
+        if (!session.roomId || !session.playerId) {
+          hub.send(session.connectionId, error('UNAUTHORIZED', 'Not in a room'));
+          return;
+        }
+        await roomLocks.withLock(session.roomId, async () => {
+          const room = roomRegistry.get(session.roomId!);
+          if (!room) failNotFound();
+          try {
+            const bc = applyPlayerAction(room, {
+              playerId: session.playerId!,
+              handId: event.handId,
+              action: event.action as ActionType,
+              amount: event.amount,
+              clientActionId: event.clientActionId,
+            });
+            emitHandBroadcast(room.roomId, bc);
+          } catch (err) {
+            const e = getServiceError(err);
+            hub.send(session.connectionId, error(e.code, e.message));
+          }
+        });
+        return;
+      }
+
+      default:
+        hub.send(session.connectionId, error('UNSUPPORTED', 'Unknown event'));
+    }
+  } catch (err) {
+    const e = getServiceError(err);
+    hub.send(session.connectionId, error(e.code, e.message));
+  }
+}
+
+function failNotFound(): never {
+  const e = new Error('Room not found') as Error & { code: string };
+  e.code = 'ROOM_NOT_FOUND';
+  throw e;
+}
+
+function emitHandBroadcast(
+  roomId: string,
+  bc: import('../domain/handService.js').HandBroadcast,
+): void {
+  for (const deal of bc.deals) {
+    hub.sendToPlayer(roomId, deal.playerId, {
+      type: 'hand:dealt',
+      yourCards: deal.cards,
+    });
+  }
+  if (bc.community) {
+    hub.broadcast(roomId, {
+      type: 'hand:community',
+      cards: bc.community.cards,
+      phase: bc.community.phase,
+    });
+  }
+  if (bc.acted) {
+    hub.broadcast(roomId, {
+      type: 'player:acted',
+      seat: bc.acted.seat,
+      action: bc.acted.action as import('@poker/shared').PlayerActionName,
+      amount: bc.acted.amount,
+    });
+  }
+  if (bc.pots) {
+    hub.broadcast(roomId, { type: 'pot:update', pots: bc.pots });
+  }
+  if (bc.showdown) {
+    hub.broadcast(roomId, { type: 'showdown:reveal', hands: bc.showdown.hands });
+  }
+  if (bc.result) {
+    hub.broadcast(roomId, {
+      type: 'hand:result',
+      winners: bc.result.winners,
+      payouts: bc.result.payouts,
+    });
+  }
+  if (bc.turn) {
+    hub.broadcast(roomId, { type: 'turn:begin', seat: bc.turn.seat });
+  }
+  // Always send personalized snapshots after state change
+  broadcastSnapshots(roomId);
+}
+
+export function onDisconnect(session: ClientSession): void {
+  if (session.roomId && session.playerId) {
+    detachConnection(session.roomId, session.playerId, session.connectionId);
+    broadcastSnapshots(session.roomId);
+  }
+  hub.remove(session.connectionId);
+}

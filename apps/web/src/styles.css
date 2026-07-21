@@ -3,6 +3,7 @@
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   background: #0f172a;
   color: #e2e8f0;
+  line-height: 1.4;
 }
 
 * {
@@ -17,50 +18,137 @@ body {
 #root {
   min-height: 100vh;
   display: grid;
-  place-items: center;
-  padding: 1.5rem;
+  place-items: start center;
+  padding: 1rem;
 }
 
 .app {
-  width: min(28rem, 100%);
+  width: min(40rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.panel {
   background: #1e293b;
   border: 1px solid #334155;
   border-radius: 1rem;
-  padding: 1.5rem;
-  box-shadow: 0 20px 40px rgb(0 0 0 / 0.35);
+  padding: 1.25rem;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.3);
 }
 
-h1 {
-  margin: 0 0 0.5rem;
-  font-size: 1.5rem;
+.panel.wide {
+  width: 100%;
+}
+
+h1,
+h2 {
+  margin: 0 0 0.35rem;
 }
 
 .muted {
   color: #94a3b8;
-  margin: 0 0 1.25rem;
+  margin: 0 0 1rem;
 }
 
-.status {
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.9rem;
+}
+
+input {
+  border-radius: 0.6rem;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.65rem 0.75rem;
+  font-size: 1rem;
+}
+
+button {
+  border-radius: 0.65rem;
+  border: 1px solid #475569;
+  background: #334155;
+  color: #f8fafc;
+  padding: 0.65rem 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: #16a34a;
+  border-color: #15803d;
+}
+
+button.ghost {
+  background: transparent;
+}
+
+button.small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+.avatar-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.avatar {
+  font-size: 1.4rem;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+}
+
+.avatar.selected {
+  outline: 2px solid #22c55e;
+}
+
+.conn {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  border-radius: 0.75rem;
-  background: #0f172a;
-  border: 1px solid #334155;
-  font-weight: 600;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
 }
 
 .dot {
-  width: 0.75rem;
-  height: 0.75rem;
+  width: 0.6rem;
+  height: 0.6rem;
   border-radius: 999px;
   background: #64748b;
 }
 
 .dot.connected {
   background: #22c55e;
-  box-shadow: 0 0 0 4px rgb(34 197 94 / 0.2);
 }
 
 .dot.connecting {
@@ -71,9 +159,141 @@ h1 {
   background: #ef4444;
 }
 
+.error {
+  color: #fca5a5;
+  margin: 0.4rem 0;
+}
+
+.error.banner {
+  background: #450a0a;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.5rem;
+}
+
 .meta {
-  margin-top: 1rem;
-  font-size: 0.85rem;
   color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.meta.break,
+.break {
   word-break: break-all;
+}
+
+.code {
+  font-size: 1.6rem;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+}
+
+.meta-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.player-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+
+.player-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid #334155;
+}
+
+.player-list.compact li {
+  font-size: 0.85rem;
+}
+
+.cards {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.card {
+  border-radius: 0.45rem;
+  border: 1px solid #64748b;
+  background: #f8fafc;
+  color: #0f172a;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  box-shadow: 0 2px 0 #94a3b8;
+}
+
+.card.sm {
+  width: 2.4rem;
+  height: 3.3rem;
+  font-size: 0.75rem;
+}
+
+.card.md {
+  width: 3rem;
+  height: 4.2rem;
+  font-size: 0.9rem;
+}
+
+.card.lg {
+  width: 4rem;
+  height: 5.6rem;
+  font-size: 1.1rem;
+}
+
+.card.red {
+  color: #dc2626;
+}
+
+.card.black {
+  color: #0f172a;
+}
+
+.card.back {
+  background: linear-gradient(135deg, #1d4ed8, #312e81);
+  color: #e2e8f0;
+  border-color: #1e3a8a;
+}
+
+.card .rank {
+  line-height: 1;
+}
+
+.card .suit {
+  line-height: 1;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.pot {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.result {
+  background: #14532d;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.mesa .community {
+  justify-content: center;
+  min-height: 6rem;
+}
+
+.community.large .cards,
+.community.large {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
 }
