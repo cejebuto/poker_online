@@ -28,6 +28,16 @@ function toPublicPlayer(p: InternalPlayer): PublicPlayer {
 }
 
 /**
+ * Chips in play for the hand. The engine only builds `pots` when the hand
+ * resolves, so while betting is live the contributions are the real total.
+ */
+function handPotTotal(hand: NonNullable<InternalRoom['hand']>): number {
+  const committed = hand.players.reduce((sum, p) => sum + p.contribution, 0);
+  if (committed > 0) return committed;
+  return hand.pots.reduce((sum, p) => sum + p.amount, 0);
+}
+
+/**
  * Build client-safe room state.
  * Never includes password, passwordHash, deck, or other players' hole cards.
  */
@@ -100,6 +110,7 @@ export function toPublicRoomState(
       currentBet: room.hand.currentBet,
       minRaise: room.hand.minRaise,
       button: room.hand.button,
+      potTotal: handPotTotal(room.hand),
       ...(yourCards ? { yourCards } : {}),
       ...(room.turnStartedAt ? { turnStartedAt: room.turnStartedAt } : {}),
       turnTimeoutMs: turnTimeoutMs(room.config),

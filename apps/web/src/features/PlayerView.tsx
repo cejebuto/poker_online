@@ -18,11 +18,13 @@ export function PlayerView({
   playerId,
   onAction,
   onOpenThemes,
+  onSwitchView,
 }: {
   state: PublicRoomState;
   playerId: string;
   onAction: (action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in', amount?: number) => void;
   onOpenThemes?: () => void;
+  onSwitchView?: () => void;
 }) {
   const orientation = useOrientation();
   const me = state.players.find((p) => p.playerId === playerId);
@@ -30,9 +32,8 @@ export function PlayerView({
   const mySeat = me?.seat ?? null;
   const isMyTurn = Boolean(hand && hand.currentToAct === mySeat && hand.phase !== 'COMPLETE');
   const toCall = hand && me ? Math.max(0, hand.currentBet - (me.betThisRound ?? 0)) : 0;
-  const potTotal =
-    hand?.pots.reduce((s, p) => s + p.amount, 0) ??
-    state.players.reduce((s, p) => s + (p.betThisRound ?? 0), 0);
+  // Server-computed: `pots` is empty until the hand resolves.
+  const potTotal = hand?.potTotal ?? 0;
 
   /** Rivals still contesting — never their cards, only the count. */
   const oppCount = hand
@@ -68,6 +69,11 @@ export function PlayerView({
           {me?.avatar} {me?.displayName}
         </h2>
         <div className="row">
+          {onSwitchView ? (
+            <button type="button" className="ghost small" onClick={onSwitchView}>
+              Vista mesa
+            </button>
+          ) : null}
           {onOpenThemes ? (
             <button type="button" className="ghost small" onClick={onOpenThemes}>
               Temas

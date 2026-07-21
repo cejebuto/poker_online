@@ -12,6 +12,9 @@ import { TableView } from './features/TableView';
 import { describeAutoAction } from './features/handResult';
 import { NextHandPrompt } from './features/NextHandPrompt';
 import { backFor, needsLeaveConfirm, type Screen } from './features/navigation';
+import { FeltView } from './features/FeltView';
+import { describeAction } from './features/feltStats';
+import { loadPlayViewMode, savePlayViewMode, type PlayViewMode } from './features/viewMode';
 import { ThemeSettings } from './cards/ThemeSettings';
 
 type User = { displayName: string; avatar: string };
@@ -33,6 +36,8 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [themesReturn, setThemesReturn] = useState<Screen>('home');
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
+  const [playView, setPlayView] = useState<PlayViewMode>(() => loadPlayViewMode());
+  const [lastAction, setLastAction] = useState<string | null>(null);
   const [pickedRoom, setPickedRoom] = useState<string | undefined>(undefined);
   const wsRef = useRef<WsHandle | null>(null);
   const resumeAttempted = useRef(false);
@@ -103,10 +108,14 @@ export function App() {
       case 'rooms:listed':
         setRooms(event.rooms);
         break;
+      case 'player:acted':
+        setLastAction(describeAction(event.action, event.amount));
+        break;
       case 'player:auto_acted': {
         const players = roomState?.players ?? [];
         const mySeat = players.find((p) => p.playerId === playerId)?.seat ?? null;
         setNotice(describeAutoAction(event, players, mySeat));
+        setLastAction(describeAction(event.action, 0));
         break;
       }
       case 'hand:dealt':
@@ -116,6 +125,7 @@ export function App() {
             : prev,
         );
         setNotice('');
+        setLastAction(null);
         if (role !== 'mesa') setScreen('play');
         break;
       case 'hand:community':
@@ -192,6 +202,25 @@ export function App() {
       </main>
     );
   }
+
+  const switchPlayView = (mode: PlayViewMode) => {
+    setPlayView(mode);
+    savePlayViewMode(mode);
+  };
+
+  const sendPlayerAction = (
+    action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in',
+    amount?: number,
+  ) => {
+    if (!roomState?.hand) return;
+    send({
+      type: 'player:action',
+      handId: roomState.hand.handId,
+      action,
+      amount,
+      clientActionId: crypto.randomUUID(),
+    });
+  };
 
   const back = backFor(screen);
   const leaveRoom = () => {
@@ -320,21 +349,24 @@ export function App() {
       )}
       {screen === 'play' && roomState && playerId && role !== 'mesa' && (
         <>
-          <PlayerView
-            state={roomState}
-            playerId={playerId}
-            onOpenThemes={() => openThemes('play')}
-            onAction={(action, amount) => {
-              if (!roomState.hand) return;
-              send({
-                type: 'player:action',
-                handId: roomState.hand.handId,
-                action,
-                amount,
-                clientActionId: crypto.randomUUID(),
-              });
-            }}
-          />
+          {playView === 'felt' ? (
+            <FeltView
+              state={roomState}
+              playerId={playerId}
+              lastAction={lastAction}
+              onOpenMenu={() => setScreen('lobby')}
+              onSwitchView={() => switchPlayView('classic')}
+              onAction={(action, amount) => sendPlayerAction(action, amount)}
+            />
+          ) : (
+            <PlayerView
+              state={roomState}
+              playerId={playerId}
+              onOpenThemes={() => openThemes('play')}
+              onSwitchView={() => switchPlayView('felt')}
+              onAction={(action, amount) => sendPlayerAction(action, amount)}
+            />
+          )}
           <NextHandPrompt
             state={roomState}
             playerId={playerId}

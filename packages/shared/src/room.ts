@@ -88,6 +88,11 @@ export type PublicHandState = {
   currentBet: number;
   minRaise: number;
   button: number;
+  /**
+   * Every chip committed to this hand so far. `pots` only materializes when the
+   * hand resolves, so this is the number to show while betting is live.
+   */
+  potTotal: number;
   yourCards?: Card[];
   turnStartedAt?: number;
   turnTimeoutMs?: number;

@@ -12,7 +12,7 @@ export function TableView({
   onOpenThemes?: () => void;
 }) {
   const hand = state.hand;
-  const pot = hand?.pots.reduce((s, p) => s + p.amount, 0) ?? 0;
+  const pot = hand?.potTotal ?? 0;
   const handOver = !hand || hand.phase === 'COMPLETE';
   const resultText = state.lastResult
     ? describeHandResult(state.lastResult, state.players)

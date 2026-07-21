@@ -752,3 +752,292 @@ select {
   gap: 0.5rem;
   justify-content: center;
 }
+
+/* ---- Felt view: phone-first table layout ---- */
+
+.felt {
+  --felt-green: #14663f;
+  --felt-dark: #0a3a24;
+  background: radial-gradient(ellipse at 50% 30%, var(--felt-green), var(--felt-dark) 70%, #061c12);
+  border-radius: 0.9rem;
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  color: #e6f2ec;
+}
+
+.felt-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.felt-blinds {
+  flex: 1;
+  text-align: center;
+  background: #04120c;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-weight: 600;
+}
+
+.felt-blinds b {
+  color: #4ade80;
+}
+
+.felt-menu {
+  background: #04120c;
+  border: 1px solid #1f7a4d;
+  border-radius: 0.5rem;
+  color: #e6f2ec;
+  font-size: 1.1rem;
+  padding: 0.35rem 0.6rem;
+}
+
+.felt-label {
+  margin: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #9dc4b2;
+}
+
+.felt-board {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.7rem;
+}
+
+.felt-community .cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.3rem 0;
+}
+
+.felt-pot {
+  text-align: center;
+  margin-top: 0.4rem;
+}
+
+.felt-pot-amount {
+  display: block;
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #fbbf24;
+  line-height: 1.1;
+}
+
+.felt-sidepots {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.felt-sidepot {
+  flex: 1;
+  max-width: 9rem;
+  text-align: center;
+  border: 1px solid #1f7a4d;
+  border-radius: 0.5rem;
+  padding: 0.35rem;
+  color: #fbbf24;
+}
+
+.felt-status {
+  background: #04120ccc;
+  border: 1px solid #1f7a4d;
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.felt-status dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.3rem 0.6rem;
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+}
+
+.felt-status dt {
+  color: #9dc4b2;
+  font-size: 0.75rem;
+}
+
+.felt-status dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.felt-seats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.4rem;
+}
+
+.felt-seat {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #04120ccc;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+}
+
+.felt-seat.acting {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 2px #4ade8033;
+}
+
+.felt-seat.folded {
+  opacity: 0.5;
+}
+
+.felt-avatar {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.felt-seat-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+
+.felt-seat-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.felt-seat-stack {
+  color: #4ade80;
+}
+
+.felt-seat-bet {
+  color: #fbbf24;
+  font-size: 0.75rem;
+}
+
+.felt-dealer {
+  display: inline-block;
+  margin-left: 0.3rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  line-height: 1.05rem;
+  text-align: center;
+  border-radius: 50%;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.felt-hole {
+  text-align: center;
+}
+
+.felt-hole .cards {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.felt-actionbar {
+  background: #04120cf2;
+  border-radius: 0.8rem;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.felt-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.felt-stats strong {
+  display: block;
+  font-size: 1.05rem;
+}
+
+.felt-stats .accent {
+  color: #4ade80;
+}
+
+.felt-stats .warn {
+  color: #fbbf24;
+}
+
+.felt-stats .info {
+  color: #60a5fa;
+}
+
+.felt-equity {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+}
+
+.felt-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.35rem;
+}
+
+.felt-buttons button {
+  border: none;
+  border-radius: 0.55rem;
+  padding: 0.6rem 0.2rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.felt-buttons button small {
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.felt-buttons button:disabled {
+  opacity: 0.35;
+}
+
+.felt-buttons .fold { background: #b91c1c; }
+.felt-buttons .call { background: #1d4ed8; }
+.felt-buttons .raise { background: #15803d; }
+.felt-buttons .triple { background: #b45309; }
+.felt-buttons .custom { background: #334155; }
+
+.felt-switch {
+  align-self: center;
+}
+
+@media (min-width: 720px) {
+  .felt-board {
+    grid-template-columns: 1.4fr 1fr;
+    align-items: start;
+  }
+}
