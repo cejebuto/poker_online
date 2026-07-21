@@ -74,6 +74,45 @@ describe('active room directory', () => {
     assert.equal(find(listActiveRooms(), room.roomId)!.phase, 'IN_HAND');
   });
 
+  it('hides a room nobody is connected to', async () => {
+    const room = await makeRoom('Abandonada');
+    for (const p of room.players.values()) {
+      p.connected = false;
+      p.connectionStatus = 'disconnected';
+    }
+    assert.equal(
+      find(listActiveRooms(), room.roomId),
+      undefined,
+      'a room revived from a snapshot with nobody in it must not be advertised',
+    );
+  });
+
+  it('shows the room again as soon as someone reconnects', async () => {
+    const room = await makeRoom('Vuelve');
+    const host = [...room.players.values()][0]!;
+    host.connected = false;
+    assert.equal(find(listActiveRooms(), room.roomId), undefined);
+    host.connected = true;
+    assert.ok(find(listActiveRooms(), room.roomId));
+  });
+
+  it('ignores the mesa device when deciding if anyone is present', async () => {
+    const room = await makeRoom('Solo mesa');
+    for (const p of room.players.values()) p.connected = false;
+    room.players.set('mesa-1', {
+      ...[...room.players.values()][0]!,
+      playerId: 'mesa-1',
+      role: 'mesa',
+      seat: null,
+      connected: true,
+    });
+    assert.equal(
+      find(listActiveRooms(), room.roomId),
+      undefined,
+      'a mesa screen alone is not a live table',
+    );
+  });
+
   it('sorts by player count so the busiest tables surface first', async () => {
     const quiet = await makeRoom('Vacia');
     const busy = await makeRoom('Llena');

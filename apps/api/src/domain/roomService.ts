@@ -8,6 +8,7 @@ import { roomRegistry } from './roomRegistry.js';
 import {
   ROOM_DESTROY_GRACE_MS,
   normalizeRoomConfig,
+  reconnectWindowMs,
   timeBankDefaultMs,
   type InternalPlayer,
   type InternalRoom,
@@ -273,22 +274,70 @@ export function detachConnection(
       player.disconnectedAt = Date.now();
     }
   }
+  // A host who just dropped must not keep the crown, or the table stalls until
+  // the purge window elapses. Hand it over immediately if anyone can take it.
+  reassignHostIfAbsent(room);
   room.version += 1;
   scheduleDestroyIfEmpty(room);
   return { room, left: false };
+}
+
+/** Hand the crown to the first seated successor. No-op if the leaver was not host. */
+function promoteSuccessorIfHost(room: InternalRoom, leaver: InternalPlayer): void {
+  if (leaver.role !== 'host') return;
+  const nextHost = [...room.players.values()].find((p) => p.role !== 'mesa');
+  if (nextHost) {
+    nextHost.role = 'host';
+    room.hostPlayerId = nextHost.playerId;
+  }
+}
+
+/**
+ * Move the crown off a host who is no longer connected, provided someone else can
+ * hold it. This unblocks a table where the host dropped: without a present host,
+ * the first hand can never be started. A reconnecting ex-host does not get it back.
+ */
+export function reassignHostIfAbsent(room: InternalRoom): string | null {
+  const host = room.players.get(room.hostPlayerId);
+  if (host?.connected) return null;
+  const successor = [...room.players.values()].find(
+    (p) => p.role !== 'mesa' && p.connected,
+  );
+  if (!successor) return null;
+  if (host) host.role = 'player';
+  successor.role = 'host';
+  room.hostPlayerId = successor.playerId;
+  room.version += 1;
+  return successor.playerId;
+}
+
+/**
+ * Remove players who dropped and never came back within the reconnect window.
+ * A player still contesting a live hand is spared until the hand resolves — the
+ * pot and side-pot math need their seat. Returns the ids removed.
+ */
+export function purgeStaleDisconnected(room: InternalRoom, now = Date.now()): string[] {
+  const windowMs = reconnectWindowMs(room.config);
+  const handLive = Boolean(room.hand && room.hand.phase !== 'COMPLETE');
+  const removed: string[] = [];
+  for (const p of [...room.players.values()]) {
+    if (p.role === 'mesa' || p.connected) continue;
+    if (p.disconnectedAt === null || now - p.disconnectedAt < windowMs) continue;
+    // Spare a seat the current hand still depends on.
+    if (handLive && p.seat !== null && room.hand!.players.some((hp) => hp.seat === p.seat)) {
+      continue;
+    }
+    leaveRoom(room, p.playerId);
+    removed.push(p.playerId);
+  }
+  return removed;
 }
 
 export function leaveRoom(room: InternalRoom, playerId: string): void {
   const player = room.players.get(playerId);
   if (!player) return;
   room.players.delete(playerId);
-  if (player.role === 'host') {
-    const nextHost = [...room.players.values()].find((p) => p.role !== 'mesa');
-    if (nextHost) {
-      nextHost.role = 'host';
-      room.hostPlayerId = nextHost.playerId;
-    }
-  }
+  promoteSuccessorIfHost(room, player);
   room.version += 1;
   scheduleDestroyIfEmpty(room);
   void persistRoomMeta(room);
@@ -334,7 +383,7 @@ export function updateConfig(
 
 const destroyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-function scheduleDestroyIfEmpty(room: InternalRoom): void {
+export function scheduleDestroyIfEmpty(room: InternalRoom): void {
   const humans = [...room.players.values()].filter((p) => p.role !== 'mesa');
   const anyConnected = humans.some((p) => p.connected);
   if (humans.length === 0 || !anyConnected) {

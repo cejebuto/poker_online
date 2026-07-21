@@ -10,6 +10,7 @@ import type { Card } from '@poker/shared';
 import type { InternalRoom } from './types.js';
 import { newId } from './ids.js';
 import { resetReady, seatedForHand } from './readiness.js';
+import { purgeStaleDisconnected } from './roomService.js';
 import {
   appendDomainEvents,
   markProcessedAction,
@@ -224,6 +225,8 @@ function finishHandSideEffects(room: InternalRoom): void {
     room.phase = 'LOBBY';
   }
   applyPostHandModeRules(room);
+  // Players who dropped mid-hand were spared until now; free their seats.
+  purgeStaleDisconnected(room);
 }
 
 export function applyPlayerAction(

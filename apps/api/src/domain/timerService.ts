@@ -4,6 +4,7 @@ import { roomLocks } from './lock.js';
 import { reconnectWindowMs, turnTimeoutMs, type InternalRoom } from './types.js';
 import { hub } from '../ws/hub.js';
 import { toPublicRoomState } from './publicState.js';
+import { purgeStaleDisconnected } from './roomService.js';
 import { newId } from './ids.js';
 
 type TimerKey = string; // roomId:handId:seat:phase
@@ -174,24 +175,29 @@ export function scheduleDisconnectWatch(roomId: string, playerId: string): void 
       const p = r.players.get(playerId);
       if (!p || p.connected) return;
       if (p.connectionStatus !== 'disconnected') return;
-      p.connectionStatus = 'sitting_out';
-      r.version += 1;
-      // If it is their turn mid-hand, force auto-fold/check now
-      if (r.hand && p.seat !== null && r.hand.currentToAct === p.seat) {
-        const jkey = jobKey(
-          r.roomId,
-          r.hand.handId,
-          p.seat,
-          `${r.hand.phase}:disconnect`,
-        );
-        void runAutoAction(r.roomId, p.seat, jkey, 'disconnect');
+
+      const inLiveHand =
+        r.hand && r.hand.phase !== 'COMPLETE' && p.seat !== null &&
+        r.hand.players.some((hp) => hp.seat === p.seat);
+
+      if (inLiveHand) {
+        // Still committed to the pot: keep the seat, sit them out, and auto-act
+        // if it is their turn. purgeStaleDisconnected removes them once the hand ends.
+        p.connectionStatus = 'sitting_out';
+        r.version += 1;
+        if (r.hand!.currentToAct === p.seat) {
+          const jkey = jobKey(r.roomId, r.hand!.handId, p.seat!, `${r.hand!.phase}:disconnect`);
+          void runAutoAction(r.roomId, p.seat!, jkey, 'disconnect');
+          return;
+        }
       } else {
-        hub.broadcastMap(roomId, (s) =>
-          s.playerId
-            ? { type: 'state:snapshot', roomState: toPublicRoomState(r, s.playerId) }
-            : null,
-        );
+        purgeStaleDisconnected(r);
       }
+      hub.broadcastMap(roomId, (s) =>
+        s.playerId
+          ? { type: 'state:snapshot', roomState: toPublicRoomState(r, s.playerId) }
+          : null,
+      );
     });
   }, windowMs);
   t.unref?.();
