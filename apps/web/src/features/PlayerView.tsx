@@ -1,56 +1,74 @@
 import type { PublicRoomState } from '@poker/shared';
-import { SimpleCard } from '../cards/SimpleCard';
+import { CommunityRow, PlayingCard } from '../cards/PlayingCard';
+import { useOrientation } from '../hooks/useOrientation';
 
 export function PlayerView({
   state,
   playerId,
   onAction,
+  onOpenThemes,
 }: {
   state: PublicRoomState;
   playerId: string;
   onAction: (action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in', amount?: number) => void;
+  onOpenThemes?: () => void;
 }) {
+  const orientation = useOrientation();
   const me = state.players.find((p) => p.playerId === playerId);
   const hand = state.hand;
   const mySeat = me?.seat ?? null;
   const isMyTurn = hand?.currentToAct === mySeat && hand.phase !== 'COMPLETE';
   const toCall = hand && me ? Math.max(0, hand.currentBet - (me.betThisRound ?? 0)) : 0;
-  const potTotal = hand?.pots.reduce((s, p) => s + p.amount, 0) ??
+  const potTotal =
+    hand?.pots.reduce((s, p) => s + p.amount, 0) ??
     state.players.reduce((s, p) => s + (p.betThisRound ?? 0), 0);
 
   return (
-    <section className="panel wide table">
+    <section
+      className={`panel wide table player-view orient-${orientation}`}
+      data-orientation={orientation}
+    >
       <header className="row between">
         <h2>
           {me?.avatar} {me?.displayName}
         </h2>
-        <span className="meta">
-          Stack {me?.stack ?? 0} · Fase {hand?.phase ?? '—'}
-        </span>
+        <div className="row">
+          {onOpenThemes ? (
+            <button type="button" className="ghost small" onClick={onOpenThemes}>
+              Temas
+            </button>
+          ) : null}
+          <span className="meta">
+            Stack {me?.stack ?? 0} · {hand?.phase ?? '—'}
+          </span>
+        </div>
       </header>
 
-      <div className="community">
-        <p className="muted">Comunitarias</p>
-        <div className="cards">
-          {(hand?.community ?? []).map((c, i) => (
-            <SimpleCard key={i} card={c} size="sm" />
-          ))}
+      <div className="player-layout">
+        <div className="zone community-zone">
+          <p className="muted">Comunitarias</p>
+          <CommunityRow cards={hand?.community ?? []} size="sm" />
+          <p className="meta">
+            Bote ~{potTotal} · mesa {hand?.currentBet ?? 0} · a pagar {toCall}
+            {isMyTurn ? ' · TU TURNO' : ''}
+          </p>
+        </div>
+
+        <div className="zone holes-zone">
+          <p className="muted">Tus cartas</p>
+          <div className="cards holes">
+            {(hand?.yourCards ?? [null, null]).map((c, i) => (
+              <PlayingCard
+                key={i}
+                card={c}
+                faceDown={!c}
+                size="lg"
+                animate={c ? 'deal' : 'none'}
+              />
+            ))}
+          </div>
         </div>
       </div>
-
-      <div className="holes">
-        <p className="muted">Tus cartas</p>
-        <div className="cards">
-          {(hand?.yourCards ?? []).map((c, i) => (
-            <SimpleCard key={i} card={c} size="lg" />
-          ))}
-        </div>
-      </div>
-
-      <p className="meta">
-        Bote ~{potTotal} · apuesta mesa {hand?.currentBet ?? 0} · a pagar {toCall}
-        {isMyTurn ? ' · TU TURNO' : ''}
-      </p>
 
       {state.lastResult ? (
         <p className="result">
@@ -63,18 +81,10 @@ export function PlayerView({
         <button type="button" disabled={!isMyTurn} onClick={() => onAction('fold')}>
           Fold
         </button>
-        <button
-          type="button"
-          disabled={!isMyTurn || toCall > 0}
-          onClick={() => onAction('check')}
-        >
+        <button type="button" disabled={!isMyTurn || toCall > 0} onClick={() => onAction('check')}>
           Check
         </button>
-        <button
-          type="button"
-          disabled={!isMyTurn || toCall <= 0}
-          onClick={() => onAction('call')}
-        >
+        <button type="button" disabled={!isMyTurn || toCall <= 0} onClick={() => onAction('call')}>
           Call {toCall || ''}
         </button>
         <button
@@ -94,7 +104,7 @@ export function PlayerView({
 
       <ul className="player-list compact">
         {state.players.map((p) => (
-          <li key={p.playerId}>
+          <li key={p.playerId} className={hand?.currentToAct === p.seat ? 'to-act' : ''}>
             Asiento {p.seat}: {p.displayName} · {p.stack}
             {p.status ? ` · ${p.status}` : ''}
             {p.betThisRound ? ` · bet ${p.betThisRound}` : ''}

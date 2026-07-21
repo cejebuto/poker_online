@@ -9,6 +9,7 @@ import { JoinRoom } from './features/JoinRoom';
 import { Lobby } from './features/Lobby';
 import { PlayerView } from './features/PlayerView';
 import { TableView } from './features/TableView';
+import { ThemeSettings } from './cards/ThemeSettings';
 
 type Screen =
   | 'user'
@@ -18,7 +19,8 @@ type Screen =
   | 'mesa-join'
   | 'lobby'
   | 'play'
-  | 'table';
+  | 'table'
+  | 'themes';
 
 type User = { displayName: string; avatar: string };
 
@@ -36,9 +38,15 @@ export function App() {
   const [roomState, setRoomState] = useState<PublicRoomState | null>(null);
   const [error, setError] = useState<string>('');
   const [busy, setBusy] = useState(false);
+  const [themesReturn, setThemesReturn] = useState<Screen>('home');
   const wsRef = useRef<WsHandle | null>(null);
   const resumeAttempted = useRef(false);
   const prefill = useMemo(() => joinRoomIdFromPath(), []);
+
+  const openThemes = (from: Screen) => {
+    setThemesReturn(from);
+    setScreen('themes');
+  };
 
   const onEvent = useCallback((event: WsServerEvent) => {
     switch (event.type) {
@@ -169,12 +177,20 @@ export function App() {
     <main className="app">
       <Conn status={status} />
       {screen === 'home' && (
-        <Home
-          joinPrefill={prefill}
-          onCreate={() => setScreen('create')}
-          onJoin={() => setScreen('join')}
-          onMesa={() => setScreen('mesa-join')}
-        />
+        <>
+          <Home
+            joinPrefill={prefill}
+            onCreate={() => setScreen('create')}
+            onJoin={() => setScreen('join')}
+            onMesa={() => setScreen('mesa-join')}
+          />
+          <button type="button" className="ghost" onClick={() => openThemes('home')}>
+            Ajustes de cartas / temas
+          </button>
+        </>
+      )}
+      {screen === 'themes' && (
+        <ThemeSettings onClose={() => setScreen(themesReturn)} />
       )}
       {screen === 'create' && user && (
         <CreateRoom
@@ -236,6 +252,7 @@ export function App() {
           <PlayerView
             state={roomState}
             playerId={playerId}
+            onOpenThemes={() => openThemes('play')}
             onAction={(action, amount) => {
               if (!roomState.hand) return;
               send({
@@ -255,7 +272,7 @@ export function App() {
         </>
       )}
       {(screen === 'table' || role === 'mesa') && roomState && role === 'mesa' && (
-        <TableView state={roomState} />
+        <TableView state={roomState} onOpenThemes={() => openThemes('table')} />
       )}
       {error && screen !== 'create' && screen !== 'join' ? (
         <p className="error banner">{error}</p>
