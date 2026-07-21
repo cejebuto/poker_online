@@ -51,12 +51,16 @@ export function CommunityRow({
   cards,
   size = 'sm',
   max = 5,
+  pad = true,
 }: {
   cards: Card[];
   size?: CardSize;
   max?: number;
+  /** Fill the row to `max` with face-down placeholders. Off once no more cards are coming. */
+  pad?: boolean;
 }) {
-  const slots = Array.from({ length: max }, (_, i) => cards[i] ?? null);
+  const length = pad ? max : Math.min(cards.length, max);
+  const slots = Array.from({ length }, (_, i) => cards[i] ?? null);
   return (
     <div className="community-row" role="group" aria-label="Community cards">
       {slots.map((c, i) => (

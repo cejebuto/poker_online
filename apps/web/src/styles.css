@@ -188,6 +188,28 @@ button.small {
   border-radius: 0.5rem;
 }
 
+.notice {
+  color: #fde68a;
+  margin: 0.4rem 0;
+}
+
+.notice.banner {
+  background: #422006;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.5rem;
+}
+
+.next-hand {
+  background: #0b2545;
+  border: 1px solid #1d4ed8;
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  margin: 0.6rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 .meta {
   color: #94a3b8;
   font-size: 0.85rem;

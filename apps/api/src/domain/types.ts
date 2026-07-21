@@ -16,6 +16,8 @@ export type InternalPlayer = {
   timeBankMs: number;
   rebuyCount: number;
   finishPlace?: number;
+  /** Accepted the next hand. Transient: cleared whenever a hand starts. */
+  ready: boolean;
   connectionIds: Set<string>;
 };
 

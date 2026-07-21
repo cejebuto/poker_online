@@ -46,6 +46,8 @@ export type WsClientEvent =
   | { type: 'player:kick'; playerId: string }
   | { type: 'player:leave' }
   | { type: 'hand:start' }
+  /** Accept (or take back) the next hand. Omit `ready` to accept. */
+  | { type: 'hand:ready'; ready?: boolean }
   | {
       type: 'player:action';
       handId: string;

@@ -18,6 +18,7 @@ import {
 import { applyPlayerAction, startRoomHand } from '../domain/handService.js';
 import { scheduleDisconnectWatch } from '../domain/timerService.js';
 import { applyRebuy } from '../domain/modes.js';
+import { readySummary, setPlayerReady } from '../domain/readiness.js';
 import { RL, rateLimit } from '../domain/rateLimit.js';
 import type { ClientSession } from './hub.js';
 import { hub } from './hub.js';
@@ -279,6 +280,30 @@ export async function handleClientEvent(
           }
           const bc = startRoomHand(room);
           emitHandBroadcast(room.roomId, bc);
+        });
+        return;
+      }
+
+      case 'hand:ready': {
+        if (!session.roomId || !session.playerId) {
+          hub.send(session.connectionId, error('UNAUTHORIZED', 'Not in a room'));
+          return;
+        }
+        await roomLocks.withLock(session.roomId, async () => {
+          const room = roomRegistry.get(session.roomId!);
+          if (!room) failNotFound();
+          if (room.phase === 'IN_HAND') {
+            hub.send(session.connectionId, error('HAND_IN_PROGRESS', 'A hand is already running'));
+            return;
+          }
+          setPlayerReady(room, session.playerId!, event.ready ?? true);
+
+          if (readySummary(room).allReady) {
+            const bc = startRoomHand(room);
+            emitHandBroadcast(room.roomId, bc);
+          } else {
+            broadcastSnapshots(room.roomId);
+          }
         });
         return;
       }

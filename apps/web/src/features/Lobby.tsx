@@ -1,9 +1,11 @@
 import type { PublicRoomState } from '@poker/shared';
+import { NextHandPrompt } from './NextHandPrompt';
 
 export function Lobby({
   state,
   playerId,
   onStart,
+  onReady,
   onLeave,
   onKick,
   onRebuy,
@@ -11,6 +13,7 @@ export function Lobby({
   state: PublicRoomState;
   playerId: string;
   onStart: () => void;
+  onReady: (ready: boolean) => void;
   onLeave: () => void;
   onKick: (id: string) => void;
   onRebuy?: () => void;
@@ -100,6 +103,7 @@ export function Lobby({
               {p.rebuyCount ? ` · rebuys ${p.rebuyCount}` : ''}
               {p.finishPlace ? ` · #${p.finishPlace}` : ''}
               {!p.connected ? ' (offline)' : ''}
+              {state.lastResult && p.ready ? ' · listo ✓' : ''}
             </span>
             {isHost && p.playerId !== playerId && p.status !== 'ELIMINATED' ? (
               <button type="button" className="ghost small" onClick={() => onKick(p.playerId)}>
@@ -110,12 +114,22 @@ export function Lobby({
         ))}
       </ul>
 
+      {/* Between hands the whole table votes; before the first one the host deals. */}
+      {state.lastResult ? (
+        <NextHandPrompt
+          state={state}
+          playerId={playerId}
+          onReady={onReady}
+          onForceStart={onStart}
+        />
+      ) : null}
+
       <div className="row">
         {isHost && state.phase === 'LOBBY' ? (
           <button type="button" className="primary" disabled={!canStart} onClick={onStart}>
             Empezar mano
           </button>
-        ) : state.phase === 'LOBBY' ? (
+        ) : state.phase === 'LOBBY' && !state.lastResult ? (
           <p className="muted">Esperando al host…</p>
         ) : null}
         {canRebuy && onRebuy ? (

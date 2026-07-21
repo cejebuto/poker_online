@@ -11,6 +11,7 @@ import {
   useEquity,
 } from '../probability/useEquity';
 import { TurnTimer } from './TurnTimer';
+import { describeHandResult } from './handResult';
 
 export function PlayerView({
   state,
@@ -40,6 +41,12 @@ export function PlayerView({
         return p.status !== 'FOLDED';
       }).length
     : 0;
+
+  /** No live hand awaiting action: the betting controls and turn clock are meaningless. */
+  const handOver = !hand || hand.phase === 'COMPLETE';
+  const resultText = state.lastResult
+    ? describeHandResult(state.lastResult, state.players)
+    : null;
 
   const [equityOn, setEquityOn] = useState(() => loadEquityEnabled());
   const equity = useEquity({
@@ -71,7 +78,7 @@ export function PlayerView({
       <div className="player-layout">
         <div className="zone community-zone">
           <p className="muted">Comunitarias</p>
-          <CommunityRow cards={hand?.community ?? []} size="sm" />
+          <CommunityRow cards={hand?.community ?? []} size="sm" pad={!handOver} />
           <div className="row pot-row">
             <IsoChipStack amount={potTotal} compact label="Bote" />
             <p className="meta">
@@ -84,6 +91,7 @@ export function PlayerView({
             turnTimeoutMs={hand?.turnTimeoutMs}
             timeBankMs={hand?.actorTimeBankMs}
             isMyTurn={isMyTurn}
+            active={!handOver && hand.currentToAct !== null}
           />
         </div>
 
@@ -114,25 +122,22 @@ export function PlayerView({
         </div>
       </div>
 
-      {state.lastResult ? (
-        <p className="result">
-          Resultado: asientos {state.lastResult.winners.join(', ')} ·{' '}
-          {JSON.stringify(state.lastResult.payouts)}
-        </p>
-      ) : null}
+      {resultText ? <p className="result">{resultText}</p> : null}
 
-      <BettingPanel
-        ctx={{
-          stack: me?.stack ?? 0,
-          toCall,
-          minRaise: hand?.minRaise ?? 10,
-          currentBet: hand?.currentBet ?? 0,
-          myBetThisRound: me?.betThisRound ?? 0,
-          canCheck: toCall === 0,
-          disabled: !isMyTurn,
-        }}
-        onConfirm={onAction}
-      />
+      {handOver ? null : (
+        <BettingPanel
+          ctx={{
+            stack: me?.stack ?? 0,
+            toCall,
+            minRaise: hand?.minRaise ?? 10,
+            currentBet: hand?.currentBet ?? 0,
+            myBetThisRound: me?.betThisRound ?? 0,
+            canCheck: toCall === 0,
+            disabled: !isMyTurn,
+          }}
+          onConfirm={onAction}
+        />
+      )}
 
       <ul className="player-list compact">
         {state.players.map((p) => (

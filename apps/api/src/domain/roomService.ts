@@ -104,6 +104,7 @@ export async function createRoom(input: {
     disconnectedAt: null,
     timeBankMs: timeBankDefaultMs(config),
     rebuyCount: 0,
+    ready: false,
     connectionIds: new Set([input.connectionId]),
   };
 
@@ -182,6 +183,7 @@ export async function joinRoom(input: {
       disconnectedAt: null,
       timeBankMs: 0,
       rebuyCount: 0,
+      ready: false,
       connectionIds: new Set([input.connectionId]),
     };
     room.players.set(playerId, player);
@@ -217,6 +219,7 @@ export async function joinRoom(input: {
     disconnectedAt: null,
     timeBankMs: timeBankDefaultMs(room.config),
     rebuyCount: 0,
+    ready: false,
     connectionIds: new Set([input.connectionId]),
   };
   room.players.set(playerId, player);

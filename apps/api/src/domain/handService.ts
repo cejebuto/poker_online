@@ -9,6 +9,7 @@ import {
 import type { Card } from '@poker/shared';
 import type { InternalRoom } from './types.js';
 import { newId } from './ids.js';
+import { resetReady, seatedForHand } from './readiness.js';
 import {
   appendDomainEvents,
   markProcessedAction,
@@ -155,14 +156,7 @@ export function startRoomHand(room: InternalRoom): HandBroadcast {
 
   maybeAdvanceBlindLevel(room);
 
-  const seated = [...room.players.values()].filter(
-    (p) =>
-      p.role !== 'mesa' &&
-      p.seat !== null &&
-      p.stack > 0 &&
-      p.connectionStatus !== 'sitting_out' &&
-      p.connectionStatus !== 'eliminated',
-  );
+  const seated = seatedForHand(room);
   if (seated.length < 2) fail('NOT_ENOUGH_PLAYERS', 'Need at least 2 players with chips');
 
   let button = room.hand?.button ?? seated[0]!.seat!;
@@ -195,6 +189,7 @@ export function startRoomHand(room: InternalRoom): HandBroadcast {
   room.phase = result.value.state.phase === 'COMPLETE' ? 'LOBBY' : 'IN_HAND';
   room.processedActionIds.clear();
   room.actionResults.clear();
+  resetReady(room);
   room.handsPlayed += 1;
   syncStacksFromHand(room, room.hand);
 

@@ -95,6 +95,8 @@ export function deserializeRoom(data: SerializedRoom): InternalRoom {
       timeBankMs: p.timeBankMs,
       rebuyCount: p.rebuyCount ?? 0,
       ...(p.finishPlace !== undefined ? { finishPlace: p.finishPlace } : {}),
+      // Acceptance is per-hand and never survives a restart.
+      ready: false,
       connectionIds: new Set(),
     });
   }

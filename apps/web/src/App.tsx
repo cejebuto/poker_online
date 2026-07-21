@@ -9,6 +9,8 @@ import { JoinRoom } from './features/JoinRoom';
 import { Lobby } from './features/Lobby';
 import { PlayerView } from './features/PlayerView';
 import { TableView } from './features/TableView';
+import { describeAutoAction } from './features/handResult';
+import { NextHandPrompt } from './features/NextHandPrompt';
 import { ThemeSettings } from './cards/ThemeSettings';
 
 type Screen =
@@ -37,6 +39,7 @@ export function App() {
   const [role, setRole] = useState<string | null>(null);
   const [roomState, setRoomState] = useState<PublicRoomState | null>(null);
   const [error, setError] = useState<string>('');
+  const [notice, setNotice] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [themesReturn, setThemesReturn] = useState<Screen>('home');
   const wsRef = useRef<WsHandle | null>(null);
@@ -105,12 +108,19 @@ export function App() {
           }
         }
         break;
+      case 'player:auto_acted': {
+        const players = roomState?.players ?? [];
+        const mySeat = players.find((p) => p.playerId === playerId)?.seat ?? null;
+        setNotice(describeAutoAction(event, players, mySeat));
+        break;
+      }
       case 'hand:dealt':
         setRoomState((prev) =>
           prev?.hand
             ? { ...prev, hand: { ...prev.hand, yourCards: event.yourCards } }
             : prev,
         );
+        setNotice('');
         if (role !== 'mesa') setScreen('play');
         break;
       case 'hand:community':
@@ -136,7 +146,7 @@ export function App() {
       default:
         break;
     }
-  }, [role, screen]);
+  }, [role, screen, playerId, roomState]);
 
   // onEvent changes identity whenever role/screen change. The socket must not:
   // depending on it here tore down a live connection on every screen change,
@@ -246,7 +256,11 @@ export function App() {
         <Lobby
           state={roomState}
           playerId={playerId}
-          onStart={() => send({ type: 'hand:start' })}
+          onStart={() => {
+            setNotice('');
+            send({ type: 'hand:start' });
+          }}
+          onReady={(ready) => send({ type: 'hand:ready', ready })}
           onLeave={() => {
             send({ type: 'player:leave' });
             clearSession();
@@ -275,15 +289,27 @@ export function App() {
             }}
           />
           {roomState.phase === 'LOBBY' ? (
-            <button type="button" className="primary" onClick={() => setScreen('lobby')}>
-              Volver al lobby
-            </button>
+            <>
+              <NextHandPrompt
+                state={roomState}
+                playerId={playerId}
+                onReady={(ready) => send({ type: 'hand:ready', ready })}
+                onForceStart={() => {
+                  setNotice('');
+                  send({ type: 'hand:start' });
+                }}
+              />
+              <button type="button" className="ghost" onClick={() => setScreen('lobby')}>
+                Volver al lobby
+              </button>
+            </>
           ) : null}
         </>
       )}
       {(screen === 'table' || role === 'mesa') && roomState && role === 'mesa' && (
         <TableView state={roomState} onOpenThemes={() => openThemes('table')} />
       )}
+      {notice ? <p className="notice banner">{notice}</p> : null}
       {error && screen !== 'create' && screen !== 'join' ? (
         <p className="error banner">{error}</p>
       ) : null}

@@ -57,6 +57,8 @@ export type PublicPlayer = {
   betThisRound?: number;
   timeBankMs?: number;
   rebuyCount?: number;
+  /** Accepted the next hand. */
+  ready?: boolean;
   /** Tournament finish place (1 = winner). */
   finishPlace?: number;
 };
@@ -107,6 +109,11 @@ export type PublicRoomState = {
   lastResult?: {
     payouts: Record<number, number>;
     winners: number[];
+  };
+  /** Progress toward the next hand, between hands. */
+  nextHand?: {
+    ready: number;
+    needed: number;
   };
   tournament?: PublicTournamentState;
   /** Effective blinds after structure / doubleMinimum. */

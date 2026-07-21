@@ -3,6 +3,7 @@ import type { InternalPlayer, InternalRoom } from './types.js';
 import { turnTimeoutMs } from './types.js';
 import { env } from '../config/env.js';
 import { buildPublicTournament, currentBlinds } from './modes.js';
+import { readySummary } from './readiness.js';
 
 function toPublicPlayer(p: InternalPlayer): PublicPlayer {
   let status: PublicPlayer['status'];
@@ -21,6 +22,7 @@ function toPublicPlayer(p: InternalPlayer): PublicPlayer {
     ...(status ? { status } : {}),
     timeBankMs: p.timeBankMs,
     rebuyCount: p.rebuyCount,
+    ready: p.ready,
     ...(p.finishPlace !== undefined ? { finishPlace: p.finishPlace } : {}),
   };
 }
@@ -111,6 +113,14 @@ export function toPublicRoomState(
         payouts: { ...room.hand.payouts },
         winners,
       };
+    }
+  }
+
+  // Only meaningful between hands, where the next-hand prompt is shown.
+  if (room.phase !== 'IN_HAND') {
+    const summary = readySummary(room);
+    if (summary.needed > 0) {
+      state.nextHand = { ready: summary.ready, needed: summary.needed };
     }
   }
 

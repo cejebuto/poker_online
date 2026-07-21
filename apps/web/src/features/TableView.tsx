@@ -1,6 +1,7 @@
 import type { PublicRoomState } from '@poker/shared';
 import { CommunityRow } from '../cards/PlayingCard';
 import { IsoChipStack } from '../chips/IsoChipStack';
+import { describeHandResult } from './handResult';
 
 /** Mesa device: public info only, large community cards. Never private holes. */
 export function TableView({
@@ -12,6 +13,10 @@ export function TableView({
 }) {
   const hand = state.hand;
   const pot = hand?.pots.reduce((s, p) => s + p.amount, 0) ?? 0;
+  const handOver = !hand || hand.phase === 'COMPLETE';
+  const resultText = state.lastResult
+    ? describeHandResult(state.lastResult, state.players)
+    : null;
 
   return (
     <section className="panel wide table mesa">
@@ -26,7 +31,7 @@ export function TableView({
       <p className="muted">Modo mesa · solo información pública</p>
 
       <div className="mesa-center">
-        <CommunityRow cards={hand?.community ?? []} size="lg" />
+        <CommunityRow cards={hand?.community ?? []} size="lg" pad={!handOver} />
         <div className={hand?.phase === 'COMPLETE' ? 'card-anim-reveal' : ''}>
           <IsoChipStack amount={pot} label="Bote" />
         </div>
@@ -51,12 +56,7 @@ export function TableView({
         ))}
       </ul>
 
-      {state.lastResult ? (
-        <p className="result card-anim-reveal">
-          Ganadores asientos: {state.lastResult.winners.join(', ')} · reparto{' '}
-          {JSON.stringify(state.lastResult.payouts)}
-        </p>
-      ) : null}
+      {resultText ? <p className="result card-anim-reveal">{resultText}</p> : null}
     </section>
   );
 }
