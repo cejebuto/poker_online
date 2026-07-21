@@ -199,6 +199,18 @@ button.small {
   border-radius: 0.5rem;
 }
 
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  background: #0f172a;
+}
+
 .dealer-badge {
   display: inline-block;
   margin-left: 0.4rem;

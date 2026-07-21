@@ -11,18 +11,8 @@ import { PlayerView } from './features/PlayerView';
 import { TableView } from './features/TableView';
 import { describeAutoAction } from './features/handResult';
 import { NextHandPrompt } from './features/NextHandPrompt';
+import { backFor, needsLeaveConfirm, type Screen } from './features/navigation';
 import { ThemeSettings } from './cards/ThemeSettings';
-
-type Screen =
-  | 'user'
-  | 'home'
-  | 'create'
-  | 'join'
-  | 'mesa-join'
-  | 'lobby'
-  | 'play'
-  | 'table'
-  | 'themes';
 
 type User = { displayName: string; avatar: string };
 
@@ -203,9 +193,49 @@ export function App() {
     );
   }
 
+  const back = backFor(screen);
+  const leaveRoom = () => {
+    send({ type: 'player:leave' });
+    clearSession();
+    setRoomState(null);
+    setRole(null);
+    setPlayerId(null);
+    setPickedRoom(undefined);
+    setNotice('');
+    setScreen('home');
+  };
+  const goBack = () => {
+    if (!back) return;
+    switch (back.action) {
+      case 'home':
+        setPickedRoom(undefined);
+        setScreen('home');
+        break;
+      case 'themes-return':
+        setScreen(themesReturn);
+        break;
+      case 'lobby':
+        setScreen('lobby');
+        break;
+      case 'leave':
+        if (needsLeaveConfirm(roomState?.phase) && !window.confirm('¿Salir de la mesa? Perdés tu asiento en la mano en curso.')) {
+          return;
+        }
+        leaveRoom();
+        break;
+    }
+  };
+
   return (
     <main className="app">
-      <Conn status={status} />
+      <div className="topbar">
+        <Conn status={status} />
+        {back ? (
+          <button type="button" className="ghost small" onClick={goBack}>
+            {back.label}
+          </button>
+        ) : null}
+      </div>
       {screen === 'home' && (
         <>
           <Home
@@ -305,21 +335,20 @@ export function App() {
               });
             }}
           />
-          {roomState.phase === 'LOBBY' ? (
-            <>
-              <NextHandPrompt
-                state={roomState}
-                playerId={playerId}
-                onReady={(ready) => send({ type: 'hand:ready', ready })}
-                onForceStart={() => {
-                  setNotice('');
-                  send({ type: 'hand:start' });
-                }}
-              />
-              <button type="button" className="ghost" onClick={() => setScreen('lobby')}>
-                Volver al lobby
-              </button>
-            </>
+          <NextHandPrompt
+            state={roomState}
+            playerId={playerId}
+            onReady={(ready) => send({ type: 'hand:ready', ready })}
+            onForceStart={() => {
+              setNotice('');
+              send({ type: 'hand:start' });
+            }}
+          />
+          {/* Never gated on room phase: a FINISHED tournament used to leave no way out. */}
+          {roomState.hand?.phase === 'COMPLETE' || roomState.phase !== 'IN_HAND' ? (
+            <button type="button" className="ghost" onClick={() => setScreen('lobby')}>
+              Volver al lobby
+            </button>
           ) : null}
         </>
       )}
