@@ -8,6 +8,13 @@ import {
   encodeStackVisual,
   MAX_STACK_HEIGHT,
 } from '../src/chips/denominations.js';
+import {
+  amountAfterScrubSteps,
+  isThrowConfirm,
+  scrubStepsFromDelta,
+  THROW_THRESHOLD_PX,
+  throwProgress,
+} from '../src/chips/gestureMath.js';
 
 describe('chip encoding', () => {
   it('breaks amount into denominations', () => {
@@ -72,5 +79,37 @@ describe('clampBetAmount', () => {
 
   it('allows exact call', () => {
     assert.equal(clampBetAmount({ ...base, amount: 50 }), 50);
+  });
+});
+
+describe('gestureMath (betting zones)', () => {
+  it('confirms throw only past threshold', () => {
+    assert.equal(isThrowConfirm(THROW_THRESHOLD_PX), false);
+    assert.equal(isThrowConfirm(THROW_THRESHOLD_PX + 1), true);
+    assert.equal(isThrowConfirm(0), false);
+    assert.equal(isThrowConfirm(-20), false);
+  });
+
+  it('maps throw progress 0..1', () => {
+    assert.equal(throwProgress(0), 0);
+    assert.equal(throwProgress(THROW_THRESHOLD_PX / 2), 0.5);
+    assert.equal(throwProgress(THROW_THRESHOLD_PX * 3), 1);
+  });
+
+  it('scrubs in discrete pixel steps without double-counting', () => {
+    const first = scrubStepsFromDelta(50, 0, 24);
+    assert.equal(first.steps, 2);
+    assert.equal(first.deltaSteps, 2);
+    const second = scrubStepsFromDelta(55, first.nextLastStep, 24);
+    assert.equal(second.deltaSteps, 0);
+    const third = scrubStepsFromDelta(72, second.nextLastStep, 24);
+    assert.equal(third.steps, 3);
+    assert.equal(third.deltaSteps, 1);
+  });
+
+  it('applies scrub step amounts', () => {
+    assert.equal(amountAfterScrubSteps(100, 2, 50), 200);
+    assert.equal(amountAfterScrubSteps(100, -1, 50), 50);
+    assert.equal(amountAfterScrubSteps(100, 0, 50), 100);
   });
 });
