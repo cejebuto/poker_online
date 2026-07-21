@@ -21,6 +21,9 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
   wss.on('connection', (socket) => {
     const connectionId = randomBytes(8).toString('hex');
     const session = hub.register(connectionId, socket);
+    void import('../observability/metrics.js').then(({ metrics }) => {
+      metrics.wsConnections += 1;
+    });
 
     socket.on('message', (buf) => {
       const event = parseClientEvent(buf.toString());
@@ -36,6 +39,9 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
     });
 
     socket.on('close', () => {
+      void import('../observability/metrics.js').then(({ metrics }) => {
+        metrics.wsConnections = Math.max(0, metrics.wsConnections - 1);
+      });
       onDisconnect(session);
     });
   });

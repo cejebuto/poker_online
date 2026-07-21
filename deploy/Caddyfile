@@ -1,0 +1,28 @@
+# TLS reverse proxy for HTTPS + WSS.
+# Local: SITE_ADDRESS=localhost → Caddy may use internal certs.
+# Public: set SITE_ADDRESS=poker.example.com and open 80/443.
+
+{$SITE_ADDRESS:localhost} {
+  encode gzip
+
+  # API HTTP
+  handle /health {
+    reverse_proxy api:3001
+  }
+  handle /metrics {
+    reverse_proxy api:3001
+  }
+  handle /rooms/* {
+    reverse_proxy api:3001
+  }
+
+  # WebSocket
+  handle /ws {
+    reverse_proxy api:3001
+  }
+
+  # SPA + static
+  handle {
+    reverse_proxy web:80
+  }
+}

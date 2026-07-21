@@ -210,6 +210,17 @@ export function startRoomHand(room: InternalRoom): HandBroadcast {
     room.hand.phase === 'COMPLETE',
   );
   afterTurnChange(room);
+  void import('../observability/metrics.js').then(({ metrics }) => {
+    metrics.handsStarted += 1;
+    if (broadcast.handComplete) metrics.handsCompleted += 1;
+  });
+  void import('../observability/logger.js').then(({ logger }) => {
+    logger.info('hand:started', {
+      roomId: room.roomId,
+      handId: room.hand?.handId,
+      players: seated.length,
+    });
+  });
   return broadcast;
 }
 
@@ -274,12 +285,28 @@ export function applyPlayerAction(
   const result = applyAction(activeHand, engineAction);
   if (!result.ok) fail(result.error.code, result.error.message);
 
+  const t0 = Date.now();
   clearTurnTimer(room);
   room.hand = result.value.state;
   room.processedActionIds.add(input.clientActionId);
   syncStacksFromHand(room, room.hand);
 
   const broadcast = extractFromDomain(room, room.hand, result.value.events);
+  void import('../observability/metrics.js').then(({ metrics, recordLatency }) => {
+    metrics.actionsApplied += 1;
+    recordLatency(Date.now() - t0);
+    if (broadcast.handComplete) metrics.handsCompleted += 1;
+  });
+  void import('../observability/logger.js').then(({ logger }) => {
+    logger.info('player:action', {
+      roomId: room.roomId,
+      handId: room.hand?.handId,
+      playerId: input.playerId,
+      action: input.action,
+      clientActionId: input.clientActionId,
+      ms: Date.now() - t0,
+    });
+  });
   room.actionResults.set(input.clientActionId, {
     domainEvents: [],
     deals: broadcast.deals,

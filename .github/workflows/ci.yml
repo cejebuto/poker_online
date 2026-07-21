@@ -34,13 +34,22 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Test
+      - name: Unit + integration + e2e-domain
         run: pnpm test
+
+      - name: Load test (domain)
+        run: pnpm test:load 15 1
 
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Docker compose build
+      - name: Docker compose build (dev)
         run: docker compose build
+
+      - name: Docker compose build (prod)
+        run: docker compose -f docker-compose.prod.yml build
+        env:
+          POSTGRES_PASSWORD: ci-password
+          JWT_SECRET: ci-jwt-secret-not-for-production-use

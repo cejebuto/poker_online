@@ -135,6 +135,11 @@ export async function createRoom(input: {
   await persistRoomMeta(room);
   await saveSnapshot(room);
 
+  const { metrics } = await import('../observability/metrics.js');
+  metrics.roomsCreated += 1;
+  const { logger } = await import('../observability/logger.js');
+  logger.info('room:created', { roomId, code, hostPlayerId: playerId });
+
   const token = signSession({
     playerId,
     roomId,

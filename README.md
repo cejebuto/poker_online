@@ -74,3 +74,17 @@ implementacion/   plan por fases
 ## Fases
 
 Ver [`implementacion/README.md`](./implementacion/README.md). Los archivos `*_ok.md` marcan fases ya implementadas.
+
+## QA y despliegue
+
+```bash
+pnpm test              # unit + integración + e2e-domain
+pnpm test:load         # carga N salas (P95 < 150ms objetivo local)
+pnpm deploy:prod       # requiere .env.production
+pnpm backup:pg         # dump Postgres
+```
+
+- Deploy: [`docs/deploy.md`](./docs/deploy.md)
+- Seguridad: [`docs/security-medium-checklist.md`](./docs/security-medium-checklist.md)
+- Spec §19: [`docs/spec-open-questions.md`](./docs/spec-open-questions.md)
+- Temas de cartas: [`apps/web/src/cards/README.md`](./apps/web/src/cards/README.md)

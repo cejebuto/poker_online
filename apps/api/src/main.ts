@@ -10,6 +10,10 @@ import { attachWebSocket } from './ws/gateway.js';
 import { hydrateRoomsFromSnapshots } from './domain/hydrate.js';
 import { roomPubSub } from './cache/roomPubSub.js';
 import { listHandHistory } from './persistence/eventStore.js';
+import { logger } from './observability/logger.js';
+import { metricsSnapshot } from './observability/metrics.js';
+import { roomRegistry } from './domain/roomRegistry.js';
+import { hub } from './ws/hub.js';
 
 async function bootstrap(): Promise<void> {
   const app = express();
@@ -31,6 +35,12 @@ async function bootstrap(): Promise<void> {
     res.status(code).json(body);
   });
 
+  app.get('/metrics', (_req, res) => {
+    res.json(
+      metricsSnapshot(roomRegistry.all().filter((r) => r.phase !== 'CLOSED').length),
+    );
+  });
+
   app.get('/', (_req, res) => {
     res.json({
       service: 'poker-api',
@@ -50,35 +60,34 @@ async function bootstrap(): Promise<void> {
   const redisUp = await checkRedis();
 
   if (postgresUp) {
-    await hydrateRoomsFromSnapshots();
+    const n = await hydrateRoomsFromSnapshots();
+    logger.info('hydrate complete', { rooms: n });
   }
   if (redisUp) {
     await roomPubSub.start();
   }
 
-  console.log(
-    JSON.stringify({
-      msg: 'startup',
-      engine: getEngineInfo().version,
-      postgres: postgresUp ? 'up' : 'down',
-      redis: redisUp ? 'up' : 'down',
-      port: env.port,
-    }),
-  );
+  logger.info('startup', {
+    engine: getEngineInfo().version,
+    postgres: postgresUp ? 'up' : 'down',
+    redis: redisUp ? 'up' : 'down',
+    port: env.port,
+    webOrigin: env.webOrigin,
+  });
 
   if (!postgresUp) {
-    console.warn('[api] Postgres not reachable at startup — /health will report degraded');
+    logger.warn('Postgres not reachable — health degraded');
   }
   if (!redisUp) {
-    console.warn('[api] Redis not reachable at startup — /health will report degraded');
+    logger.warn('Redis not reachable — health degraded');
   }
 
   server.listen(env.port, () => {
-    console.log(`[api] listening on :${env.port}`);
+    logger.info('listening', { port: env.port, connections: hub.dumpOpenConnectionCount() });
   });
 
   const shutdown = async (signal: string) => {
-    console.log(`[api] ${signal} received, shutting down`);
+    logger.info('shutdown', { signal });
     server.close();
     await roomPubSub.stop();
     redis.disconnect();
@@ -91,6 +100,6 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((err) => {
-  console.error('[api] fatal', err);
+  logger.error('fatal', { err: err instanceof Error ? err.message : String(err) });
   process.exit(1);
 });

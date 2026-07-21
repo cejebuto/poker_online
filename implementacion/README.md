@@ -20,7 +20,7 @@ Guía de **0 a 100** para construir la app. Cada documento es una **fase** con o
 | [`07-fase6-probabilidad_ok.md`](./07-fase6-probabilidad_ok.md) ✅ | Fase 6 | Motor Monte Carlo de probabilidad en el cliente (Web Worker). |
 | [`08-fase7-resiliencia-persistencia_ok.md`](./08-fase7-resiliencia-persistencia_ok.md) ✅ | Fase 7 | Event sourcing, reconexión con JWT, timers/time bank, colas. |
 | [`09-fase8-modalidades-seguridad_ok.md`](./09-fase8-modalidades-seguridad_ok.md) ✅ | Fase 8 | Cash game / torneo configurable + endurecimiento de seguridad media. |
-| [`10-fase9-qa-despliegue.md`](./10-fase9-qa-despliegue.md) | Fase 9 | Pruebas e2e, criterios de aceptación finales, despliegue dockerizado. |
+| [`10-fase9-qa-despliegue_ok.md`](./10-fase9-qa-despliegue_ok.md) ✅ | Fase 9 | Pruebas e2e, criterios de aceptación finales, despliegue dockerizado. |
 
 ---
 
