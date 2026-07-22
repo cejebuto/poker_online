@@ -23,6 +23,7 @@ import {
   useEquity,
 } from '../probability/useEquity';
 import { buildShowdownRows, describeMyHand, describeWinnerHeadline } from './showdown';
+import { WinCelebration } from './WinCelebration';
 import { formatChips, handCounts, potOdds, streetLabel } from './feltStats';
 
 type ActionName = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
@@ -110,6 +111,18 @@ export function FeltView({
     }
     if (!celebrating) setCredited(0);
   }, [hand?.handId, celebrating]);
+
+  // Celebrate a win once per hand: the token stops re-renders from replaying it,
+  // the same trick `creditToken` uses above.
+  const [celebratedHand, setCelebratedHand] = useState<string | null>(null);
+  const [partyOpen, setPartyOpen] = useState(false);
+  useEffect(() => {
+    const id = hand?.handId;
+    if (!id || !celebrating || myPayout <= 0) return;
+    if (celebratedHand === id) return;
+    setCelebratedHand(id);
+    setPartyOpen(true);
+  }, [hand?.handId, celebrating, myPayout, celebratedHand]);
 
   const onPotCredit = useCallback((amount: number) => {
     if (amount <= 0) return;
@@ -269,7 +282,9 @@ export function FeltView({
         <div className="felt-community">
           <p className="felt-label">Cartas comunitarias</p>
           {/* Always five slots: undealt streets sit face down until they turn. */}
-          <CommunityRow cards={hand?.community ?? []} size="sm" max={5} pad />
+          {/* 1.3 is the ceiling: five 44px cards plus gaps must fit the ~320px of
+              usable width a 375px phone leaves inside the felt, or the row wraps. */}
+          <CommunityRow cards={hand?.community ?? []} size="sm" max={5} pad halfScale={1.3} />
 
           <FeltPotDisplay
             pots={pots}
@@ -346,7 +361,13 @@ export function FeltView({
                   </span>
                   <span className="cards">
                     {row.cards.map((card, i) => (
-                      <PlayingCard key={i} card={card} size="sm" animate="reveal" />
+                      <PlayingCard
+                        key={i}
+                        card={card}
+                        size="sm"
+                        halfScale={1.3}
+                        animate="reveal"
+                      />
                     ))}
                   </span>
                   <span className="felt-showdown-hand">{row.categoryLabel}</span>
@@ -385,6 +406,7 @@ export function FeltView({
                 card={card}
                 faceDown={!card || holeFaceDown}
                 size="lg"
+                halfScale={1.35}
                 animate={holeFlips > 0 ? 'flip' : card ? 'deal' : 'none'}
               />
             ))}
@@ -519,6 +541,14 @@ export function FeltView({
         </div>
         )}
       </div>
+
+      <WinCelebration
+        open={partyOpen}
+        payout={myPayout}
+        bigBlind={bigBlind}
+        handId={hand?.handId}
+        onDone={() => setPartyOpen(false)}
+      />
 
       <FeltMenuModal
         open={menuOpen}

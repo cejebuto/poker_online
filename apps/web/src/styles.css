@@ -343,6 +343,20 @@ button.small {
   overflow: hidden;
 }
 
+/*
+ * Half-card mode: the box is shorter than the artwork inside it, so the bottom
+ * gets clipped. Square bottom corners on purpose — it should read as a card
+ * peeking out from behind another, not as a broken render.
+ */
+.playing-card[data-half='true'] {
+  overflow: hidden;
+  border-radius: 0.4rem 0.4rem 0 0;
+}
+
+.playing-card[data-half='true'] .playing-card-inner {
+  border-radius: 0.4rem;
+}
+
 .card-svg,
 .card-asset {
   display: block;
@@ -1156,6 +1170,11 @@ select {
   margin: 0.3rem 0;
 }
 
+/* Half cards are wider; claw back the gap so five never wrap to a second row. */
+.felt-community .community-row:has(.playing-card[data-half='true']) {
+  gap: 0.15rem;
+}
+
 .felt-pot {
   text-align: center;
   margin-top: 0.4rem;
@@ -1726,6 +1745,26 @@ select {
   white-space: nowrap;
 }
 
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  cursor: pointer;
+}
+
+.check-row input {
+  margin-top: 0.2rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #22c55e;
+  flex: none;
+}
+
+.check-row small {
+  display: block;
+  font-size: 0.78rem;
+}
+
 .felt-menu-swatches {
   display: flex;
   flex-wrap: wrap;
@@ -1750,6 +1789,61 @@ select {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.4rem;
+}
+
+/*
+ * Winner celebration. Pure overlay: z-index above the pot flyers (70) so it reads
+ * on top, and pointer-events off so the chips still animate and taps pass through.
+ */
+.win-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.win-confetti {
+  position: absolute;
+  top: 0;
+  border-radius: 1px;
+  will-change: transform;
+}
+
+.win-banner {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.9rem 1.8rem;
+  border-radius: 1rem;
+  background: #14532dee;
+  border: 2px solid #4ade80;
+  box-shadow: 0 18px 48px #00000066;
+  text-align: center;
+}
+
+.win-banner-title {
+  font-size: clamp(1.6rem, 7vw, 2.4rem);
+  font-weight: 900;
+  color: #f8fafc;
+  letter-spacing: 0.01em;
+}
+
+.win-banner-amount {
+  font-size: clamp(1.1rem, 5vw, 1.6rem);
+  font-weight: 800;
+  color: #fbbf24;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .win-confetti {
+    display: none;
+  }
 }
 
 /* Bet amount picker — taps + the native range, no drag zones */

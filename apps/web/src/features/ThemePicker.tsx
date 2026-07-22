@@ -21,7 +21,7 @@ export function ThemePicker({
   onOpenThemes,
   onPicked,
 }: ThemePickerProps) {
-  const { themes, activeId, setActiveId } = useCardTheme();
+  const { themes, activeId, setActiveId, halfCards, setHalfCards } = useCardTheme();
 
   return (
     <>
@@ -48,6 +48,26 @@ export function ThemePicker({
             Ajustes avanzados (cargar set propio)
           </button>
         ) : null}
+      </section>
+
+      <section className="felt-menu-section">
+        <p className="felt-label">Tamaño</p>
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={halfCards}
+            onChange={(e) => {
+              setHalfCards(e.target.checked);
+              onPicked?.();
+            }}
+          />
+          <span>
+            Medias cartas
+            <small className="meta">
+              Muestra solo la mitad de arriba para dibujarlas más grandes.
+            </small>
+          </span>
+        </label>
       </section>
 
       <section className="felt-menu-section">

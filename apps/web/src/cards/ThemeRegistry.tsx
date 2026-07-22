@@ -15,6 +15,15 @@ import {
 
 const STORAGE_KEY = 'poker.cardTheme';
 const CUSTOM_KEY = 'poker.cardTheme.custom';
+const HALF_KEY = 'poker.cardTheme.half';
+
+function loadHalfCards(): boolean {
+  try {
+    return localStorage.getItem(HALF_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
 
 type StoredSelection =
   | { kind: 'builtin'; id: string }
@@ -26,6 +35,12 @@ type ThemeContextValue = {
   activeId: string;
   setActiveId: (id: string) => void;
   registerTheme: (theme: CardTheme, persistConfig?: AssetThemeConfig) => void;
+  /**
+   * Draw only the top half of every card, magnified. Lives here so PlayingCard
+   * can read it directly — no screen has to thread it down as a prop.
+   */
+  halfCards: boolean;
+  setHalfCards: (on: boolean) => void;
   error: string | null;
   setError: (msg: string | null) => void;
 };
@@ -72,7 +87,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   });
   const [selection, setSelection] = useState<StoredSelection>(() => loadSelection());
+  const [halfCards, setHalfCardsState] = useState<boolean>(() => loadHalfCards());
   const [error, setError] = useState<string | null>(null);
+
+  const setHalfCards = useCallback((on: boolean) => {
+    setHalfCardsState(on);
+    try {
+      localStorage.setItem(HALF_KEY, on ? 'on' : 'off');
+    } catch {
+      // Private browsing — the preference simply does not persist.
+    }
+  }, []);
 
   const themes = useMemo(() => [...builtin, ...custom], [builtin, custom]);
 
@@ -132,6 +157,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     activeId,
     setActiveId,
     registerTheme,
+    halfCards,
+    setHalfCards,
     error,
     setError,
   };

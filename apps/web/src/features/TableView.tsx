@@ -76,7 +76,13 @@ export function TableView({
         }
       >
         <div className="mesa-center">
-          <CommunityRow cards={hand?.community ?? []} size="lg" max={5} pad={!handOver} />
+          <CommunityRow
+            cards={hand?.community ?? []}
+            size="lg"
+            max={5}
+            pad={!handOver}
+            halfScale={1.5}
+          />
 
           <div className="mesa-pots">
             <p className="mesa-pot-label">
