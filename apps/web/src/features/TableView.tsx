@@ -1,9 +1,21 @@
+import type { CSSProperties } from 'react';
 import type { PublicRoomState } from '@poker/shared';
-import { CommunityRow } from '../cards/PlayingCard';
-import { IsoChipStack } from '../chips/IsoChipStack';
-import { describeHandResult } from './handResult';
+import { CommunityRow, PlayingCard } from '../cards/PlayingCard';
+import { potLabel, resolvePotList } from './feltPotAnim';
+import { formatChips, streetLabel } from './feltStats';
+import { loadFeltTheme } from './feltTheme';
+import { orderedTableSeats, seatRingPositions } from './seatRing';
+import { buildShowdownRows, describeWinnerHeadline, type ShowdownRow } from './showdown';
 
-/** Mesa device: public info only, large community cards. Never private holes. */
+/**
+ * Mesa device: the shared screen. Public information only — this component never
+ * receives another player's hole cards until the server reveals them at showdown.
+ *
+ * Layout is an oval with the community cards at the middle and the seats spread
+ * around the rim by `seatRingPositions`, which handles 2 through 9 with one
+ * formula. Under 720px the absolute positioning is dropped (see styles.css) and
+ * the seats fall back to a flowing grid.
+ */
 export function TableView({
   state,
   onOpenThemes,
@@ -12,56 +24,121 @@ export function TableView({
   onOpenThemes?: () => void;
 }) {
   const hand = state.hand;
-  const pot = hand?.potTotal ?? 0;
   const handOver = !hand || hand.phase === 'COMPLETE';
-  const resultText = state.lastResult
-    ? describeHandResult(state.lastResult, state.players)
-    : null;
+  const result = state.lastResult;
+
+  const seats = orderedTableSeats(state.players);
+  const ring = seatRingPositions(seats.length);
+
+  const pots = resolvePotList(hand?.pots ?? [], hand?.potTotal ?? 0);
+  const potTotal = pots.reduce((sum, p) => sum + p.amount, 0);
+
+  // The server only puts non-folded players in `showdown`, so whoever mucked
+  // early simply has no row here — that filter is not re-decided on the client.
+  const showdownRows = result
+    ? buildShowdownRows({
+        showdown: result.showdown ?? [],
+        community: hand?.community ?? [],
+        players: state.players,
+        result,
+      })
+    : [];
+  const showdownBySeat = new Map<number, ShowdownRow>(showdownRows.map((r) => [r.seat, r]));
+  const headline = result ? describeWinnerHeadline(showdownRows, result, state.players) : '';
+
+  const feltTheme = loadFeltTheme();
 
   return (
-    <section className="panel wide table mesa">
-      <header className="row between">
-        <h1>{state.config.name}</h1>
+    <section className="mesa-table">
+      <header className="mesa-head">
+        <div>
+          <h1>{state.config.name}</h1>
+          <p className="muted">Mesa · solo información pública</p>
+        </div>
         {onOpenThemes ? (
           <button type="button" className="ghost small" onClick={onOpenThemes}>
             Temas
           </button>
         ) : null}
       </header>
-      <p className="muted">Modo mesa · solo información pública</p>
 
-      <div className="mesa-center">
-        <CommunityRow cards={hand?.community ?? []} size="lg" pad={!handOver} />
-        <div className={hand?.phase === 'COMPLETE' ? 'card-anim-reveal' : ''}>
-          <IsoChipStack amount={pot} label="Bote" />
-        </div>
-        <p className="meta">Fase: {hand?.phase ?? state.phase}</p>
-      </div>
+      <div
+        className="mesa-oval"
+        style={
+          { '--felt-green': feltTheme.green, '--felt-dark': feltTheme.dark } as CSSProperties
+        }
+      >
+        <div className="mesa-center">
+          <CommunityRow cards={hand?.community ?? []} size="lg" max={5} pad={!handOver} />
 
-      <ul className="player-list seats-ring">
-        {state.players.map((p) => (
-          <li
-            key={p.playerId}
-            className={hand?.currentToAct === p.seat ? 'to-act' : ''}
-          >
-            <strong>
-              {p.displayName} (#{p.seat})
-              {p.seat !== null && hand?.button === p.seat ? (
-                <span className="dealer-badge" title="Dealer">
-                  DEALER
-                </span>
-              ) : null}
-              {p.status ? ` · ${p.status}` : ''}
-            </strong>
-            <IsoChipStack amount={p.stack} compact />
-            {p.betThisRound ? (
-              <IsoChipStack amount={p.betThisRound} compact label="Apuesta" />
+          <div className="mesa-pots">
+            <p className="mesa-pot-label">
+              {pots.length > 1 ? 'Bote total' : potLabel(0)}
+            </p>
+            <strong className="mesa-pot-amount">{formatChips(potTotal)}</strong>
+            {pots.length > 1 ? (
+              <div className="mesa-sidepots">
+                {pots.map((pot, i) => (
+                  <span key={i} className="mesa-sidepot">
+                    {potLabel(i)} <b>{formatChips(pot.amount)}</b>
+                  </span>
+                ))}
+              </div>
             ) : null}
-          </li>
-        ))}
-      </ul>
+          </div>
 
-      {resultText ? <p className="result card-anim-reveal">{resultText}</p> : null}
+          <p className="mesa-phase">Fase: {streetLabel(hand?.phase ?? state.phase)}</p>
+          {headline ? <p className="mesa-headline">{headline}</p> : null}
+        </div>
+
+        {seats.map((p, i) => {
+          const spot = ring[i];
+          const shown = p.seat !== null ? showdownBySeat.get(p.seat) : undefined;
+          const acting = hand?.currentToAct === p.seat;
+          const folded = p.status === 'FOLDED';
+          return (
+            <div
+              key={p.playerId}
+              className={`mesa-seat${acting ? ' acting' : ''}${folded ? ' folded' : ''}${
+                shown ? ' showing' : ''
+              }${shown?.isWinner ? ' winner' : ''}`}
+              style={spot ? { left: `${spot.xPct}%`, top: `${spot.yPct}%` } : undefined}
+            >
+              <span className="mesa-avatar" aria-hidden="true">
+                {p.avatar ?? '👤'}
+              </span>
+              <div className="mesa-seat-main">
+                <span className="mesa-seat-name">
+                  {p.displayName}
+                  {p.seat !== null && hand?.button === p.seat ? (
+                    <span className="dealer-badge" title="Dealer">
+                      DEALER
+                    </span>
+                  ) : null}
+                </span>
+                <strong className="mesa-seat-stack">{formatChips(p.stack)}</strong>
+                {shown ? (
+                  <span className="mesa-seat-hand">
+                    <span className="cards">
+                      {shown.cards.map((card, ci) => (
+                        <PlayingCard key={ci} card={card} size="sm" animate="reveal" />
+                      ))}
+                    </span>
+                    <span className="mesa-seat-handname">{shown.categoryLabel}</span>
+                    {shown.payout > 0 ? (
+                      <span className="mesa-seat-payout">+{formatChips(shown.payout)}</span>
+                    ) : null}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mesa-seat-bet">
+                <span className="mesa-seat-bet-label">Apuesta</span>
+                <span className="mesa-seat-bet-amount">{formatChips(p.betThisRound ?? 0)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }

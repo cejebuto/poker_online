@@ -29,6 +29,11 @@ body {
   gap: 0.75rem;
 }
 
+/* Shared screen: the oval needs the room a phone layout would never give it. */
+.app-wide {
+  width: min(100rem, 100%);
+}
+
 .panel {
   background: #1e293b;
   border: 1px solid #334155;
@@ -431,12 +436,263 @@ button.small {
   outline: 1px solid rgb(34 197 94 / 0.4);
 }
 
+/* ---- Modo Mesa: shared screen, oval table ---- */
+
+.mesa-table {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mesa-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.mesa-head h1 {
+  font-size: clamp(1.1rem, 2.2vw, 1.7rem);
+}
+
+.mesa-oval {
+  --felt-green: #14663f;
+  --felt-dark: #0a3a24;
+  position: relative;
+  /* Panoramic on purpose: a 16/9 oval this wide runs off the bottom of a laptop. */
+  aspect-ratio: 21 / 9;
+  max-height: 76vh;
+  border-radius: 50% / 44%;
+  background: radial-gradient(ellipse at 50% 45%, var(--felt-green), var(--felt-dark) 72%, #061c12);
+  border: 1px solid #b4884655;
+  box-shadow:
+    inset 0 0 0 6px #0000002e,
+    0 20px 60px #00000055;
+  overflow: hidden;
+}
+
 .mesa-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 0 1.5rem;
+  gap: 0.5rem;
+  text-align: center;
+  /* The cards are the point of this screen: nothing sits on top of them. */
+  z-index: 2;
+  /* Never intercept a tap meant for a seat behind it. */
+  pointer-events: none;
+}
+
+.mesa-pot-label,
+.mesa-phase {
+  margin: 0;
+  font-size: clamp(0.62rem, 1vw, 0.8rem);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #9dc4b2;
+}
+
+.mesa-pot-amount {
+  display: block;
+  font-size: clamp(1.4rem, 3.4vw, 2.6rem);
+  font-weight: 800;
+  color: #fbbf24;
+  line-height: 1.1;
+}
+
+.mesa-sidepots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.mesa-sidepot {
+  background: #04120ccc;
+  border: 1px solid #1f7a4d;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: clamp(0.65rem, 1.1vw, 0.82rem);
+  color: #cbd5e1;
+}
+
+.mesa-sidepot b {
+  color: #fbbf24;
+}
+
+.mesa-headline {
+  margin: 0;
+  background: #14532dcc;
+  border: 1px solid #4ade80;
+  border-radius: 0.5rem;
+  padding: 0.3rem 0.7rem;
+  font-size: clamp(0.75rem, 1.4vw, 1rem);
+  font-weight: 700;
+}
+
+.mesa-seat {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #04120cee;
+  border: 1px solid #ffffff1f;
+  border-radius: 0.9rem;
+  padding: 0.3rem 0.55rem;
+  /* Nine of these ring a finite oval: they have to stay narrow. */
+  width: clamp(9rem, 14vw, 12.5rem);
+  color: #e6f2ec;
+}
+
+.mesa-seat.acting {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 3px #fbbf2433;
+}
+
+.mesa-seat.winner {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 3px #4ade8033;
+}
+
+.mesa-seat.folded {
+  opacity: 0.45;
+}
+
+/* At showdown the bet column is always $0 — trade it for room to show the cards. */
+.mesa-seat.showing .mesa-seat-bet {
+  display: none;
+}
+
+.mesa-avatar {
+  display: grid;
+  place-items: center;
+  width: clamp(1.9rem, 3vw, 2.6rem);
+  height: clamp(1.9rem, 3vw, 2.6rem);
+  border-radius: 50%;
+  border: 1px solid #b4884688;
+  background: #0a1f16;
+  font-size: clamp(1rem, 1.8vw, 1.4rem);
+  flex: none;
+}
+
+/* flex-basis 0 with min-width 0, or the name collapses to a single letter. */
+.mesa-seat-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.mesa-seat-name {
+  font-weight: 700;
+  font-size: clamp(0.72rem, 1.1vw, 0.95rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mesa-seat-stack {
+  font-size: clamp(0.85rem, 1.5vw, 1.2rem);
+  color: #fbbf24;
+  line-height: 1.15;
+}
+
+/*
+ * Showdown cards inside a seat. PlayingCard sizes itself with inline width/height,
+ * so the size has to be overridden from outside. `zoom` and not `transform`: a
+ * transform shrinks the pixels but still reserves the original box, which left the
+ * nine pills tall enough to overlap each other and cover the board.
+ */
+.mesa-seat-hand {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.15rem;
+}
+
+.mesa-seat-hand .cards {
+  display: flex;
+  gap: 0.12rem;
+  zoom: 0.6;
+  flex: none;
+}
+
+.mesa-seat-hand .playing-card {
+  flex: none;
+}
+
+.mesa-seat-handname {
+  font-size: clamp(0.62rem, 1vw, 0.8rem);
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.mesa-seat-payout {
+  font-size: clamp(0.65rem, 1.1vw, 0.85rem);
+  font-weight: 800;
+  color: #4ade80;
+  white-space: nowrap;
+}
+
+.mesa-seat-bet {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-left: 0.45rem;
+  border-left: 1px solid #ffffff1f;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.mesa-seat-bet-label {
+  font-size: clamp(0.5rem, 0.75vw, 0.62rem);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9dc4b2;
+}
+
+.mesa-seat-bet-amount {
+  font-size: clamp(0.78rem, 1.3vw, 1rem);
+  font-weight: 700;
+}
+
+/*
+ * A portrait phone cannot hold an absolutely placed oval — the seats overlap the
+ * cards and each other. Below 720px the ring collapses into ordinary flow.
+ */
+@media (max-width: 720px) {
+  .mesa-oval {
+    aspect-ratio: auto;
+    border-radius: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.8rem;
+  }
+
+  .mesa-center {
+    position: static;
+    transform: none;
+    order: -1;
+  }
+
+  .mesa-seat {
+    position: static;
+    transform: none;
+    left: auto !important;
+    top: auto !important;
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 0.7rem;
+  }
 }
 
 .theme-settings select {
@@ -794,9 +1050,9 @@ select {
   border-radius: 0.5rem;
 }
 
-.mesa .community {
+.mesa-center .community-row {
   justify-content: center;
-  min-height: 6rem;
+  gap: clamp(0.25rem, 0.8vw, 0.6rem);
 }
 
 .community.large .cards,
@@ -976,6 +1232,30 @@ select {
   font-weight: 600;
 }
 
+/*
+ * Floating thin scrollbar: overlays the content instead of stealing a gutter,
+ * and `overscroll-behavior` keeps a flick inside the list from scrolling the page.
+ */
+.felt-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #4ade8066 transparent;
+}
+
+.felt-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.felt-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.felt-scroll::-webkit-scrollbar-thumb {
+  background: #4ade8066;
+  border-radius: 999px;
+}
+
 .felt-seats {
   list-style: none;
   margin: 0;
@@ -983,6 +1263,8 @@ select {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   gap: 0.4rem;
+  /* Nine seats must not push the action bar off a phone screen. */
+  max-height: 32vh;
 }
 
 .felt-seat {
@@ -1046,6 +1328,16 @@ select {
   font-weight: 800;
 }
 
+/* Own button, shown in the top bar because the seat list never includes me. */
+.felt-dealer-me {
+  margin-left: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  line-height: 1.7rem;
+  font-size: 0.85rem;
+  flex: none;
+}
+
 .felt-hole {
   text-align: center;
 }
@@ -1091,6 +1383,8 @@ select {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  /* Up to nine revealed hands, each with cards — scroll instead of growing. */
+  max-height: 40vh;
 }
 
 .felt-showdown-row {
@@ -1317,6 +1611,116 @@ select {
   .confirm-modal-panel {
     transform: none !important;
   }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Table menu — taps and native selects only */
+.zone-felt-menu {
+  touch-action: manipulation;
+}
+
+.felt-menu-panel {
+  width: min(26rem, 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+}
+
+.felt-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.felt-menu-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #4ade8066 transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+
+.felt-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.felt-menu-players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.felt-menu-players li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 0.45rem;
+  background: #0f172a80;
+  font-size: 0.88rem;
+}
+
+.felt-menu-players li.is-me {
+  background: #14532d80;
+}
+
+.felt-menu-player-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.felt-menu-player-meta {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.felt-menu-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.felt-menu-swatch {
+  width: 3rem;
+  height: 2.2rem;
+  border-radius: 0.5rem;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.felt-menu-swatch.is-active {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 2px #4ade8033;
+}
+
+.felt-menu-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
 }
 
 /* Bet amount picker — taps + the native range, no drag zones */

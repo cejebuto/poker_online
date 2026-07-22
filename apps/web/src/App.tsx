@@ -276,8 +276,11 @@ export function App() {
     }
   };
 
+  // The shared screen needs the whole width; every other screen stays phone-sized.
+  const onMesa = screen === 'table' || role === 'mesa';
+
   return (
-    <main className="app">
+    <main className={onMesa ? 'app app-wide' : 'app'}>
       <div className="topbar">
         <Conn status={status} />
         {back ? (
@@ -371,34 +374,51 @@ export function App() {
       {screen === 'play' && roomState && playerId && role !== 'mesa' && (
         <>
           {playView === 'felt' ? (
+            /* Felt takes the prompt as a slot: between hands it replaces the cards. */
             <FeltView
               state={roomState}
               playerId={playerId}
               lastAction={lastAction}
-              onOpenMenu={() => setScreen('lobby')}
+              nextHandSlot={
+                <NextHandPrompt
+                  state={roomState}
+                  playerId={playerId}
+                  onReady={(ready) => send({ type: 'hand:ready', ready })}
+                  onForceStart={() => {
+                    setNotice('');
+                    send({ type: 'hand:start' });
+                  }}
+                />
+              }
+              onGoToLobby={() => setScreen('lobby')}
+              onOpenThemes={() => openThemes('play')}
               onSwitchView={() => switchPlayView('classic')}
               onAction={(action, amount) => sendPlayerAction(action, amount)}
             />
           ) : (
-            <PlayerView
-              state={roomState}
-              playerId={playerId}
-              onOpenThemes={() => openThemes('play')}
-              onSwitchView={() => switchPlayView('felt')}
-              onAction={(action, amount) => sendPlayerAction(action, amount)}
-            />
+            <>
+              <PlayerView
+                state={roomState}
+                playerId={playerId}
+                onOpenThemes={() => openThemes('play')}
+                onSwitchView={() => switchPlayView('felt')}
+                onAction={(action, amount) => sendPlayerAction(action, amount)}
+              />
+              <NextHandPrompt
+                state={roomState}
+                playerId={playerId}
+                onReady={(ready) => send({ type: 'hand:ready', ready })}
+                onForceStart={() => {
+                  setNotice('');
+                  send({ type: 'hand:start' });
+                }}
+              />
+            </>
           )}
-          <NextHandPrompt
-            state={roomState}
-            playerId={playerId}
-            onReady={(ready) => send({ type: 'hand:ready', ready })}
-            onForceStart={() => {
-              setNotice('');
-              send({ type: 'hand:start' });
-            }}
-          />
-          {/* Never gated on room phase: a FINISHED tournament used to leave no way out. */}
-          {roomState.hand?.phase === 'COMPLETE' || roomState.phase !== 'IN_HAND' ? (
+          {/* Felt has its own exit in the table menu; the top bar is the other one.
+              Never gated on room phase: a FINISHED tournament used to leave no way out. */}
+          {playView !== 'felt' &&
+          (roomState.hand?.phase === 'COMPLETE' || roomState.phase !== 'IN_HAND') ? (
             <button type="button" className="ghost" onClick={() => setScreen('lobby')}>
               Volver al lobby
             </button>

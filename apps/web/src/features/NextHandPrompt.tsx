@@ -15,6 +15,16 @@ function pending(players: PublicPlayer[]): PublicPlayer[] {
 }
 
 /**
+ * The table is waiting to deal again.
+ *
+ * Exported because Vista Mesa hands its whole card area over to this prompt, and
+ * the two must never disagree about when that happens.
+ */
+export function isBetweenHands(state: PublicRoomState): boolean {
+  return Boolean(state.nextHand) && state.phase === 'LOBBY';
+}
+
+/**
  * Between hands: every seated player accepts before the next deal. The host keeps
  * an override so an absent player cannot freeze the table.
  */
@@ -30,7 +40,7 @@ export function NextHandPrompt({
   onForceStart: () => void;
 }) {
   const next = state.nextHand;
-  if (!next || state.phase !== 'LOBBY') return null;
+  if (!isBetweenHands(state) || !next) return null;
 
   const isHost = state.hostPlayerId === playerId;
   const me = state.players.find((p) => p.playerId === playerId);

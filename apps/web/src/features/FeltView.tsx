@@ -1,12 +1,15 @@
 import { useDrag } from '@use-gesture/react';
 import { motion } from 'motion/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { PublicRoomState } from '@poker/shared';
 import { CommunityRow, PlayingCard } from '../cards/PlayingCard';
 import { isSwipeFlip } from '../chips/gestureMath';
 import { useJuice } from '../juice/useJuice';
 import { BetAmountModal } from './BetAmountModal';
 import { ConfirmModal } from './ConfirmModal';
+import { FeltMenuModal } from './FeltMenuModal';
+import { loadFeltTheme, resolveFeltTheme, saveFeltTheme } from './feltTheme';
+import { isBetweenHands } from './NextHandPrompt';
 import {
   canAffordTotal,
   minAggressiveAction,
@@ -34,32 +37,43 @@ type PendingConfirm = 'fold' | 'all-in' | 'amount' | null;
  * ├── [hole-zone]     drag-x → flip my cards (the only drag on this screen)
  * ├── [stack-target]  bottom stats (magnet destination)
  * ├── [actionbar]     tap zones (see buttons)
- * ├── [showdown]      display only, after the hand
- * └── [modals]        overlay taps + native range input
+ * ├── [showdown]      display only, after the hand — own scroll container
+ * └── [modals]        overlay taps + native inputs
  */
 export function FeltView({
   state,
   playerId,
   lastAction,
+  nextHandSlot,
   onAction,
-  onOpenMenu,
+  onGoToLobby,
+  onOpenThemes,
   onSwitchView,
 }: {
   state: PublicRoomState;
   playerId: string;
   lastAction: string | null;
+  /** Between hands this replaces the hole cards entirely (see isBetweenHands). */
+  nextHandSlot?: ReactNode;
   onAction: (action: ActionName, amount?: number) => void;
-  onOpenMenu: () => void;
+  onGoToLobby: () => void;
+  onOpenThemes: () => void;
   onSwitchView: () => void;
 }) {
   const { play } = useJuice();
   const [pending, setPending] = useState<PendingConfirm>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [feltTheme, setFeltTheme] = useState(() => loadFeltTheme());
   const stackTargetRef = useRef<HTMLDivElement>(null);
   const hand = state.hand;
   const me = state.players.find((p) => p.playerId === playerId);
   const mySeat = me?.seat ?? null;
   const handOver = !hand || hand.phase === 'COMPLETE';
   const isMyTurn = Boolean(hand && hand.currentToAct === mySeat && !handOver);
+  const iAmButton = mySeat !== null && hand?.button === mySeat;
+  // The table is waiting to deal: the prompt takes the card area and the action
+  // buttons make no sense, so both give way to the seat list.
+  const betweenHands = isBetweenHands(state) && Boolean(nextHandSlot);
 
   // Drop pending confirms if the turn ends under the modal.
   useEffect(() => {
@@ -222,12 +236,31 @@ export function FeltView({
   };
 
   return (
-    <section className="felt">
+    <section
+      className="felt"
+      style={
+        { '--felt-green': feltTheme.green, '--felt-dark': feltTheme.dark } as CSSProperties
+      }
+    >
       <header className="felt-top">
         <div className="felt-blinds">
           Blinds <b>{state.effectiveSmallBlind}</b>/<b>{state.effectiveBigBlind}</b>
         </div>
-        <button type="button" className="felt-menu" aria-label="Menú" onClick={onOpenMenu}>
+        {/* The seat list never includes me, so my own button would be invisible. */}
+        {iAmButton ? (
+          <span className="felt-dealer felt-dealer-me" title="Sos el dealer">
+            D
+          </span>
+        ) : null}
+        <button
+          type="button"
+          className="felt-menu"
+          aria-label="Menú de mesa"
+          onClick={() => {
+            setMenuOpen(true);
+            play('tick');
+          }}
+        >
           ☰
         </button>
       </header>
@@ -269,7 +302,7 @@ export function FeltView({
         </aside>
       </div>
 
-      <ul className="felt-seats">
+      <ul className="felt-seats felt-scroll">
         {opponents.map((p) => (
           <li
             key={p.playerId}
@@ -301,7 +334,7 @@ export function FeltView({
         <section className="felt-showdown">
           <p className="result">{resultText}</p>
           {showdownRows.length ? (
-            <ul className="felt-showdown-list">
+            <ul className="felt-showdown-list felt-scroll">
               {showdownRows.map((row) => (
                 <li
                   key={row.seat}
@@ -329,33 +362,38 @@ export function FeltView({
         </section>
       ) : null}
 
-      {/* Zone: hole cards — drag-x flips them */}
-      <div ref={holeZoneRef} className="felt-hole zone-felt-hole">
-        <div className="felt-hole-head">
-          <p className="felt-label">Mis cartas</p>
-          <button
-            type="button"
-            className="ghost small"
-            aria-pressed={holeFaceDown}
-            onClick={flipHole}
-          >
-            {holeFaceDown ? 'Ver' : 'Ocultar'}
-          </button>
+      {betweenHands ? (
+        nextHandSlot
+      ) : (
+        /* Zone: hole cards — drag-x flips them */
+        <div ref={holeZoneRef} className="felt-hole zone-felt-hole">
+          <div className="felt-hole-head">
+            <p className="felt-label">Mis cartas</p>
+            <button
+              type="button"
+              className="ghost small"
+              aria-pressed={holeFaceDown}
+              onClick={flipHole}
+            >
+              {holeFaceDown ? 'Ver' : 'Ocultar'}
+            </button>
+          </div>
+          <div className="cards">
+            {(hand?.yourCards ?? [null, null]).map((card, i) => (
+              <PlayingCard
+                key={`${holeFlips}-${i}`}
+                card={card}
+                faceDown={!card || holeFaceDown}
+                size="lg"
+                animate={holeFlips > 0 ? 'flip' : card ? 'deal' : 'none'}
+              />
+            ))}
+          </div>
+          <p className="meta small">Deslizá ← o → para dar vuelta las cartas</p>
+          {/* Always rendered: dropping the line made everything below it jump. */}
+          <p className="felt-my-hand accent">{myHandName ?? '•••'}</p>
         </div>
-        <div className="cards">
-          {(hand?.yourCards ?? [null, null]).map((card, i) => (
-            <PlayingCard
-              key={`${holeFlips}-${i}`}
-              card={card}
-              faceDown={!card || holeFaceDown}
-              size="lg"
-              animate={holeFlips > 0 ? 'flip' : card ? 'deal' : 'none'}
-            />
-          ))}
-        </div>
-        <p className="meta small">Deslizá ← o → para dar vuelta las cartas</p>
-        {myHandName ? <p className="felt-my-hand accent">{myHandName}</p> : null}
-      </div>
+      )}
 
       <div className="felt-actionbar">
         <div className="felt-stats zone-felt-stats">
@@ -408,6 +446,7 @@ export function FeltView({
         </div>
 
         {/* Zone: action taps only — touch-action manipulation */}
+        {betweenHands ? null : (
         <div className="felt-buttons zone-felt-actions">
           {passive === 'check' ? (
             <motion.button
@@ -478,11 +517,40 @@ export function FeltView({
             All-in
           </motion.button>
         </div>
-
-        <button type="button" className="ghost small felt-switch" onClick={onSwitchView}>
-          Vista clásica
-        </button>
+        )}
       </div>
+
+      <FeltMenuModal
+        open={menuOpen}
+        state={state}
+        playerId={playerId}
+        feltThemeId={feltTheme.id}
+        equityOn={equityOn}
+        onFeltTheme={(id) => {
+          setFeltTheme(resolveFeltTheme(id));
+          saveFeltTheme(id);
+        }}
+        onEquity={(on) => {
+          setEquityOn(on);
+          saveEquityEnabled(on);
+        }}
+        onClose={() => {
+          setMenuOpen(false);
+          play('tick');
+        }}
+        onOpenThemes={() => {
+          setMenuOpen(false);
+          onOpenThemes();
+        }}
+        onSwitchView={() => {
+          setMenuOpen(false);
+          onSwitchView();
+        }}
+        onGoToLobby={() => {
+          setMenuOpen(false);
+          onGoToLobby();
+        }}
+      />
 
       <BetAmountModal
         open={pending === 'amount'}
