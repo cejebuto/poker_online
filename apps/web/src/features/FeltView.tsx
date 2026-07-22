@@ -19,7 +19,7 @@ import {
   saveEquityEnabled,
   useEquity,
 } from '../probability/useEquity';
-import { buildShowdownRows, describeWinnerHeadline } from './showdown';
+import { buildShowdownRows, describeMyHand, describeWinnerHeadline } from './showdown';
 import { formatChips, handCounts, potOdds, streetLabel } from './feltStats';
 
 type ActionName = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
@@ -117,14 +117,6 @@ export function FeltView({
     (p) => p.playerId !== playerId && p.role !== 'mesa' && p.seat !== null,
   );
 
-  const [equityOn, setEquityOn] = useState(() => loadEquityEnabled());
-  const equity = useEquity({
-    hero: hand?.yourCards,
-    community: hand?.community ?? [],
-    opponents: Math.max(0, counts.inHand - 1),
-    enabled: equityOn && hand?.yourCards?.length === 2 && counts.inHand > 1,
-  });
-
   // --- Zone: hole cards (drag-x → flip). Swiping either way turns them over. ---
   const holeZoneRef = useRef<HTMLDivElement>(null);
   const [holeFaceDown, setHoleFaceDown] = useState(false);
@@ -153,6 +145,18 @@ export function FeltView({
       pointer: { touch: true },
     },
   );
+
+  // Covering the cards has to cover what gives them away: the hand name and the
+  // equity read out my hole cards just as loudly as the cards themselves.
+  const myHandName = holeFaceDown ? null : describeMyHand(hand?.yourCards, hand?.community ?? []);
+
+  const [equityOn, setEquityOn] = useState(() => loadEquityEnabled());
+  const equity = useEquity({
+    hero: hand?.yourCards,
+    community: hand?.community ?? [],
+    opponents: Math.max(0, counts.inHand - 1),
+    enabled: equityOn && !holeFaceDown && hand?.yourCards?.length === 2 && counts.inHand > 1,
+  });
 
   const showdownRows = result
     ? buildShowdownRows({
@@ -350,6 +354,7 @@ export function FeltView({
           ))}
         </div>
         <p className="meta small">Deslizá ← o → para dar vuelta las cartas</p>
+        {myHandName ? <p className="felt-my-hand accent">{myHandName}</p> : null}
       </div>
 
       <div className="felt-actionbar">
@@ -384,13 +389,15 @@ export function FeltView({
             >
               <span className="felt-label">Equity</span>
               <strong className="warn">
-                {!equityOn
-                  ? 'off'
-                  : equity.calculating
-                    ? '…'
-                    : equity.result
-                      ? `${equity.result.winPct.toFixed(0)}%`
-                      : '—'}
+                {holeFaceDown
+                  ? '•••'
+                  : !equityOn
+                    ? 'off'
+                    : equity.calculating
+                      ? '…'
+                      : equity.result
+                        ? `${equity.result.winPct.toFixed(0)}%`
+                        : '—'}
               </strong>
             </button>
           </div>

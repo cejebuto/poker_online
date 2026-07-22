@@ -1071,6 +1071,13 @@ select {
   margin-top: 0.3rem;
 }
 
+.felt-my-hand {
+  margin: 0.35rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
 .felt-showdown {
   display: flex;
   flex-direction: column;

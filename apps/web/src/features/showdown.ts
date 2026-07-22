@@ -77,6 +77,33 @@ export function describeHandName(best: readonly Card[]): string {
   }
 }
 
+/**
+ * What I am holding right now, board included. Null when there is nothing to
+ * read yet.
+ *
+ * Preflop the evaluator cannot help (it needs five cards), so the two hole cards
+ * are read on their own — a pocket pair is a pair, anything else is its high card.
+ */
+export function describeMyHand(
+  hole: readonly Card[] | undefined,
+  community: readonly Card[],
+): string | null {
+  if (!hole || hole.length < 2) return null;
+
+  const all = [...hole, ...community];
+  if (all.length >= 5) {
+    try {
+      return describeHandName(evaluateHand(all).cards);
+    } catch {
+      return null;
+    }
+  }
+
+  const [a, b] = hole;
+  if (a!.rank === b!.rank) return `${HAND_CATEGORY_ES[HandCategory.PAIR]} de ${a!.rank}`;
+  return `${HAND_CATEGORY_ES[HandCategory.HIGH_CARD]} ${highestRank(hole)}`;
+}
+
 export type HandResultLike = {
   payouts: Record<number, number>;
   winners: number[];

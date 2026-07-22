@@ -4,6 +4,7 @@ import type { Card, PublicPlayer } from '@poker/shared';
 import {
   buildShowdownRows,
   describeHandName,
+  describeMyHand,
   describeWinnerHeadline,
 } from '../src/features/showdown.js';
 
@@ -124,6 +125,31 @@ describe('describeHandName', () => {
 
   it('names the high card', () => {
     assert.equal(describeHandName(cards('AS', '9H', '7D', '4C', '2S')), 'Carta alta A');
+  });
+});
+
+describe('describeMyHand', () => {
+  it('reads the board together with my hole cards', () => {
+    assert.equal(describeMyHand(cards('AH', '5H'), COMMUNITY), 'Color al A');
+    assert.equal(describeMyHand(cards('KS', '9C'), COMMUNITY), 'Doble par K y 9');
+  });
+
+  it('works on the flop, before the board is complete', () => {
+    assert.equal(describeMyHand(cards('7S', '7D'), cards('7H', 'KD', '2C')), 'Trío de 7');
+  });
+
+  it('preflop calls a pocket pair a pair', () => {
+    assert.equal(describeMyHand(cards('AS', 'AD'), []), 'Par de A');
+  });
+
+  it('preflop with two different cards is just the high card', () => {
+    assert.equal(describeMyHand(cards('AS', 'KD'), []), 'Carta alta A');
+  });
+
+  it('has nothing to say without two hole cards', () => {
+    assert.equal(describeMyHand(undefined, COMMUNITY), null);
+    assert.equal(describeMyHand(cards('AS'), COMMUNITY), null);
+    assert.equal(describeMyHand([], []), null);
   });
 });
 
