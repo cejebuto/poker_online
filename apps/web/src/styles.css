@@ -599,6 +599,30 @@ button.small {
   text-overflow: ellipsis;
 }
 
+/* Sits outside .mesa-seat-name on purpose — that span truncates. */
+.mesa-seat .dealer-badge {
+  align-self: flex-start;
+  margin: 0.1rem 0;
+}
+
+/* The dealer button on the felt: same angle as its seat, shorter radius. */
+.mesa-button-puck {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: clamp(1.5rem, 2.2vw, 2.1rem);
+  height: clamp(1.5rem, 2.2vw, 2.1rem);
+  border-radius: 50%;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 900;
+  font-size: clamp(0.7rem, 1.1vw, 1rem);
+  border: 2px solid #b48846;
+  box-shadow: 0 3px 10px #00000066;
+}
+
 .mesa-seat-stack {
   font-size: clamp(0.85rem, 1.5vw, 1.2rem);
   color: #fbbf24;
@@ -692,6 +716,11 @@ button.small {
     width: 100%;
     justify-content: space-between;
     border-radius: 0.7rem;
+  }
+
+  /* No ring to anchor to once the seats flow; the DEALER badge carries it. */
+  .mesa-button-puck {
+    display: none;
   }
 }
 

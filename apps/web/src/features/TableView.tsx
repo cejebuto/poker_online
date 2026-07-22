@@ -1,11 +1,15 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { PublicRoomState } from '@poker/shared';
 import { CommunityRow, PlayingCard } from '../cards/PlayingCard';
 import { potLabel, resolvePotList } from './feltPotAnim';
 import { formatChips, streetLabel } from './feltStats';
-import { loadFeltTheme } from './feltTheme';
+import { loadFeltTheme, resolveFeltTheme, saveFeltTheme } from './feltTheme';
 import { orderedTableSeats, seatRingPositions } from './seatRing';
 import { buildShowdownRows, describeWinnerHeadline, type ShowdownRow } from './showdown';
+import { ThemeModal } from './ThemeModal';
+
+/** How far in from the seats the dealer button sits, as a share of the ring. */
+const BUTTON_RING_SCALE = 0.66;
 
 /**
  * Mesa device: the shared screen. Public information only — this component never
@@ -29,6 +33,10 @@ export function TableView({
 
   const seats = orderedTableSeats(state.players);
   const ring = seatRingPositions(seats.length);
+  // Same angles, shorter radius: the button lands between its seat and the board.
+  const buttonRing = seatRingPositions(seats.length, BUTTON_RING_SCALE);
+  const buttonIndex = seats.findIndex((p) => p.seat !== null && p.seat === hand?.button);
+  const buttonSpot = buttonIndex >= 0 ? buttonRing[buttonIndex] : undefined;
 
   const pots = resolvePotList(hand?.pots ?? [], hand?.potTotal ?? 0);
   const potTotal = pots.reduce((sum, p) => sum + p.amount, 0);
@@ -46,7 +54,8 @@ export function TableView({
   const showdownBySeat = new Map<number, ShowdownRow>(showdownRows.map((r) => [r.seat, r]));
   const headline = result ? describeWinnerHeadline(showdownRows, result, state.players) : '';
 
-  const feltTheme = loadFeltTheme();
+  const [feltTheme, setFeltTheme] = useState(() => loadFeltTheme());
+  const [themesOpen, setThemesOpen] = useState(false);
 
   return (
     <section className="mesa-table">
@@ -55,11 +64,9 @@ export function TableView({
           <h1>{state.config.name}</h1>
           <p className="muted">Mesa · solo información pública</p>
         </div>
-        {onOpenThemes ? (
-          <button type="button" className="ghost small" onClick={onOpenThemes}>
-            Temas
-          </button>
-        ) : null}
+        <button type="button" className="ghost small" onClick={() => setThemesOpen(true)}>
+          Temas
+        </button>
       </header>
 
       <div
@@ -108,14 +115,14 @@ export function TableView({
                 {p.avatar ?? '👤'}
               </span>
               <div className="mesa-seat-main">
-                <span className="mesa-seat-name">
-                  {p.displayName}
-                  {p.seat !== null && hand?.button === p.seat ? (
-                    <span className="dealer-badge" title="Dealer">
-                      DEALER
-                    </span>
-                  ) : null}
-                </span>
+                {/* Kept out of the name span: that one ellipsises, and it was
+                    swallowing the badge whenever the name ran long. */}
+                <span className="mesa-seat-name">{p.displayName}</span>
+                {p.seat !== null && hand?.button === p.seat ? (
+                  <span className="dealer-badge" title="Dealer">
+                    DEALER
+                  </span>
+                ) : null}
                 <strong className="mesa-seat-stack">{formatChips(p.stack)}</strong>
                 {shown ? (
                   <span className="mesa-seat-hand">
@@ -138,7 +145,29 @@ export function TableView({
             </div>
           );
         })}
+
+        {/* The dealer button itself, sitting on the felt like on a real table. */}
+        {buttonSpot ? (
+          <span
+            className="mesa-button-puck"
+            title="Botón del dealer"
+            style={{ left: `${buttonSpot.xPct}%`, top: `${buttonSpot.yPct}%` }}
+          >
+            D
+          </span>
+        ) : null}
       </div>
+
+      <ThemeModal
+        open={themesOpen}
+        feltThemeId={feltTheme.id}
+        onFeltTheme={(id) => {
+          setFeltTheme(resolveFeltTheme(id));
+          saveFeltTheme(id);
+        }}
+        {...(onOpenThemes ? { onOpenThemes } : {})}
+        onClose={() => setThemesOpen(false)}
+      />
     </section>
   );
 }

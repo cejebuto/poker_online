@@ -50,6 +50,26 @@ describe('seatRingPositions', () => {
     assert.ok(second!.xPct > 50, `expected x > 50, got ${second!.xPct}`);
   });
 
+  it('pulls the ring toward the middle when scaled down', () => {
+    const seats = seatRingPositions(6);
+    const inner = seatRingPositions(6, 0.6);
+    for (let i = 0; i < seats.length; i++) {
+      const seatDist = Math.hypot(seats[i]!.xPct - 50, seats[i]!.yPct - 50);
+      const innerDist = Math.hypot(inner[i]!.xPct - 50, inner[i]!.yPct - 50);
+      assert.ok(innerDist < seatDist, `seat ${i} should move inward`);
+    }
+  });
+
+  it('keeps the same angles when scaled, so a button lines up with its seat', () => {
+    const seats = seatRingPositions(5);
+    const inner = seatRingPositions(5, 0.5);
+    for (let i = 0; i < seats.length; i++) {
+      const seatAngle = Math.atan2(seats[i]!.yPct - 50, seats[i]!.xPct - 50);
+      const innerAngle = Math.atan2(inner[i]!.yPct - 50, inner[i]!.xPct - 50);
+      assert.ok(Math.abs(seatAngle - innerAngle) < 0.02, `seat ${i} drifted`);
+    }
+  });
+
   it('has nothing to place for an empty or nonsense table', () => {
     assert.deepEqual(seatRingPositions(0), []);
     assert.deepEqual(seatRingPositions(-3), []);

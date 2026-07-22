@@ -24,15 +24,19 @@ function round(n: number): number {
 /**
  * Points around the rim, index 0 at the bottom center — the side the person
  * looking at the screen sits on — then clockwise.
+ *
+ * `scale` pulls the whole ring toward the middle: 1 is the seat ring, and a
+ * smaller value lands between the seats and the board, which is where the dealer
+ * button sits on a real table.
  */
-export function seatRingPositions(count: number): RingPoint[] {
+export function seatRingPositions(count: number, scale = 1): RingPoint[] {
   if (!Number.isFinite(count) || count <= 0) return [];
 
   return Array.from({ length: Math.floor(count) }, (_, i) => {
     const theta = Math.PI / 2 - (2 * Math.PI * i) / count;
     return {
-      xPct: round(50 + RX * Math.cos(theta)),
-      yPct: round(50 + RY * Math.sin(theta)),
+      xPct: round(50 + RX * scale * Math.cos(theta)),
+      yPct: round(50 + RY * scale * Math.sin(theta)),
     };
   });
 }

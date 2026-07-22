@@ -1,10 +1,9 @@
 import { motion } from 'motion/react';
 import { useEffect, useId, useRef } from 'react';
 import type { PublicRoomState } from '@poker/shared';
-import { useCardTheme } from '../cards/ThemeRegistry';
 import { useJuice } from '../juice/useJuice';
-import { FELT_THEMES, type FeltTheme } from './feltTheme';
 import { formatChips } from './feltStats';
+import { ThemePicker } from './ThemePicker';
 
 export type FeltMenuModalProps = {
   open: boolean;
@@ -41,7 +40,6 @@ export function FeltMenuModal({
 }: FeltMenuModalProps) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const { themes, activeId, setActiveId } = useCardTheme();
   const { play, muted, toggleMuted } = useJuice();
 
   useEffect(() => {
@@ -61,11 +59,6 @@ export function FeltMenuModal({
 
   const seated = state.players.filter((p) => p.role !== 'mesa');
   const button = state.hand?.button;
-
-  const pickFelt = (theme: FeltTheme) => {
-    onFeltTheme(theme.id);
-    play('tick');
-  };
 
   return (
     <div className="confirm-modal-root zone-felt-menu" role="presentation">
@@ -117,49 +110,12 @@ export function FeltMenuModal({
             </ul>
           </section>
 
-          <section className="felt-menu-section">
-            <p className="felt-label">Cartas</p>
-            <label className="field">
-              Tema
-              <select
-                value={activeId}
-                onChange={(e) => {
-                  setActiveId(e.target.value);
-                  play('tick');
-                }}
-              >
-                {themes.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" className="ghost small" onClick={onOpenThemes}>
-              Ajustes avanzados (cargar set propio)
-            </button>
-          </section>
-
-          <section className="felt-menu-section">
-            <p className="felt-label">Paño</p>
-            <div className="felt-menu-swatches">
-              {FELT_THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`felt-menu-swatch${t.id === feltThemeId ? ' is-active' : ''}`}
-                  aria-pressed={t.id === feltThemeId}
-                  title={t.name}
-                  style={{
-                    background: `radial-gradient(ellipse at 50% 30%, ${t.green}, ${t.dark} 75%)`,
-                  }}
-                  onClick={() => pickFelt(t)}
-                >
-                  <span className="visually-hidden">{t.name}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+          <ThemePicker
+            feltThemeId={feltThemeId}
+            onFeltTheme={onFeltTheme}
+            onOpenThemes={onOpenThemes}
+            onPicked={() => play('tick')}
+          />
 
           <section className="felt-menu-section">
             <p className="felt-label">Opciones</p>
