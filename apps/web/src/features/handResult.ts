@@ -10,11 +10,14 @@ type AutoAction = {
 
 const chips = new Intl.NumberFormat('es-AR');
 
-function label(seat: number, players: readonly PublicPlayer[]): string {
+/** Seat as a person: avatar + name when we still know them. */
+export function seatLabel(seat: number, players: readonly PublicPlayer[]): string {
   const p = players.find((x) => x.seat === seat);
   if (!p) return `asiento ${seat}`;
   return p.avatar ? `${p.avatar} ${p.displayName}` : p.displayName;
 }
+
+const label = seatLabel;
 
 /** Human-readable outcome of a finished hand, or null when there is nothing to show. */
 export function describeHandResult(

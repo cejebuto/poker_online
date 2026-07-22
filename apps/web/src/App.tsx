@@ -138,12 +138,33 @@ export function App() {
             : prev,
         );
         break;
+      case 'showdown:reveal':
+        // The snapshot that follows carries the same cards; this only avoids the
+        // gap between the reveal and that snapshot.
+        setRoomState((prev) =>
+          prev
+            ? {
+                ...prev,
+                lastResult: {
+                  winners: [],
+                  payouts: {},
+                  ...prev.lastResult,
+                  showdown: event.hands,
+                },
+              }
+            : prev,
+        );
+        break;
       case 'hand:result':
         setRoomState((prev) =>
           prev
             ? {
                 ...prev,
-                lastResult: { winners: event.winners, payouts: event.payouts },
+                lastResult: {
+                  ...prev.lastResult,
+                  winners: event.winners,
+                  payouts: event.payouts,
+                },
               }
             : prev,
         );

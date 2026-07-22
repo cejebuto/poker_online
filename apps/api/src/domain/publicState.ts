@@ -62,6 +62,7 @@ export function toPublicRoomState(
           pub.status = hp.status;
         }
         pub.betThisRound = hp.betThisRound;
+        pub.committedThisHand = hp.contribution;
       }
     }
   }
@@ -120,9 +121,14 @@ export function toPublicRoomState(
       const winners = Object.entries(room.hand.payouts)
         .filter(([, amt]) => amt > 0)
         .map(([seat]) => Number(seat));
+      // Showdown is public once the hand is over: everyone still in it shows.
+      const showdown = room.hand.players
+        .filter((p) => p.status !== 'FOLDED')
+        .map((p) => ({ seat: p.seat, cards: p.holeCards.map((c) => ({ ...c })) }));
       state.lastResult = {
         payouts: { ...room.hand.payouts },
         winners,
+        ...(showdown.length > 1 ? { showdown } : {}),
       };
     }
   }

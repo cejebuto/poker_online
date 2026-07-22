@@ -1,8 +1,11 @@
+import { useDrag } from '@use-gesture/react';
 import { motion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PublicRoomState } from '@poker/shared';
-import { PlayingCard } from '../cards/PlayingCard';
+import { CommunityRow, PlayingCard } from '../cards/PlayingCard';
+import { isSwipeFlip } from '../chips/gestureMath';
 import { useJuice } from '../juice/useJuice';
+import { BetAmountModal } from './BetAmountModal';
 import { ConfirmModal } from './ConfirmModal';
 import {
   canAffordTotal,
@@ -16,21 +19,23 @@ import {
   saveEquityEnabled,
   useEquity,
 } from '../probability/useEquity';
-import { describeHandResult } from './handResult';
+import { buildShowdownRows, describeWinnerHeadline } from './showdown';
 import { formatChips, handCounts, potOdds, streetLabel } from './feltStats';
 
 type ActionName = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
 
-type PendingConfirm = 'fold' | 'all-in' | null;
+type PendingConfirm = 'fold' | 'all-in' | 'amount' | null;
 
 /**
- * Zone map (Vista Mesa action bar — tap zones only, no competing drag):
+ * Zone map (Vista Mesa — one continuous gesture only, the rest are taps):
  *
  * felt
  * ├── [pots-zone]     display only — magnet/vanish on hand result
+ * ├── [hole-zone]     drag-x → flip my cards (the only drag on this screen)
  * ├── [stack-target]  bottom stats (magnet destination)
  * ├── [actionbar]     tap zones (see buttons)
- * └── [confirm-modal] overlay taps only
+ * ├── [showdown]      display only, after the hand
+ * └── [modals]        overlay taps + native range input
  */
 export function FeltView({
   state,
@@ -63,6 +68,7 @@ export function FeltView({
 
   const toCall = hand && me ? Math.max(0, hand.currentBet - (me.betThisRound ?? 0)) : 0;
   const myBet = me?.betThisRound ?? 0;
+  const myCommitted = me?.committedThisHand ?? 0;
   const stack = me?.stack ?? 0;
   const currentBet = hand?.currentBet ?? 0;
   const minRaise = hand?.minRaise ?? state.effectiveBigBlind;
@@ -119,9 +125,44 @@ export function FeltView({
     enabled: equityOn && hand?.yourCards?.length === 2 && counts.inHand > 1,
   });
 
-  const resultText = state.lastResult
-    ? describeHandResult(state.lastResult, state.players)
-    : null;
+  // --- Zone: hole cards (drag-x → flip). Swiping either way turns them over. ---
+  const holeZoneRef = useRef<HTMLDivElement>(null);
+  const [holeFaceDown, setHoleFaceDown] = useState(false);
+  const [holeFlips, setHoleFlips] = useState(0);
+
+  const flipHole = useCallback(() => {
+    setHoleFaceDown((down) => !down);
+    setHoleFlips((n) => n + 1);
+    play('tick');
+  }, [play]);
+
+  // A new deal always arrives face up, whatever the last hand ended on.
+  useEffect(() => {
+    setHoleFaceDown(false);
+  }, [hand?.handId]);
+
+  useDrag(
+    ({ movement: [mx], last, canceled, tap }) => {
+      if (tap || canceled || !last) return;
+      if (isSwipeFlip(mx)) flipHole();
+    },
+    {
+      target: holeZoneRef,
+      axis: 'x',
+      filterTaps: true,
+      pointer: { touch: true },
+    },
+  );
+
+  const showdownRows = result
+    ? buildShowdownRows({
+        showdown: result.showdown ?? [],
+        community: hand?.community ?? [],
+        players: state.players,
+        result,
+      })
+    : [];
+  const resultText = result ? describeWinnerHeadline(showdownRows, result, state.players) : '';
 
   const passive = passiveAction(toCall);
   const aggressive = minAggressiveAction({ currentBet, minRaise, bigBlind });
@@ -157,6 +198,11 @@ export function FeltView({
     onAction(action, amount);
   };
 
+  const openAmountModal = () => {
+    play('tick');
+    setPending('amount');
+  };
+
   const confirmPending = () => {
     if (pending === 'fold') {
       play('confirm');
@@ -185,12 +231,8 @@ export function FeltView({
       <div className="felt-board">
         <div className="felt-community">
           <p className="felt-label">Cartas comunitarias</p>
-          <div className="cards">
-            {(hand?.community ?? []).map((card, i) => (
-              <PlayingCard key={i} card={card} size="sm" animate="reveal" />
-            ))}
-            {!hand?.community?.length ? <p className="meta">Sin repartir</p> : null}
-          </div>
+          {/* Always five slots: undealt streets sit face down until they turn. */}
+          <CommunityRow cards={hand?.community ?? []} size="sm" max={5} pad />
 
           <FeltPotDisplay
             pots={pots}
@@ -217,6 +259,8 @@ export function FeltView({
             <dd>{lastAction ?? '—'}</dd>
             <dt>Apuesta más alta</dt>
             <dd>{formatChips(currentBet)}</dd>
+            <dt>Mi apuesta</dt>
+            <dd className="info">{formatChips(myCommitted)}</dd>
           </dl>
         </aside>
       </div>
@@ -249,15 +293,63 @@ export function FeltView({
         ))}
       </ul>
 
-      {resultText ? <p className="result">{resultText}</p> : null}
+      {resultText ? (
+        <section className="felt-showdown">
+          <p className="result">{resultText}</p>
+          {showdownRows.length ? (
+            <ul className="felt-showdown-list">
+              {showdownRows.map((row) => (
+                <li
+                  key={row.seat}
+                  className={`felt-showdown-row${row.isWinner ? ' is-winner' : ''}`}
+                >
+                  <span className="felt-showdown-who">
+                    {row.avatar ? `${row.avatar} ` : ''}
+                    {row.name}
+                  </span>
+                  <span className="cards">
+                    {row.cards.map((card, i) => (
+                      <PlayingCard key={i} card={card} size="sm" animate="reveal" />
+                    ))}
+                  </span>
+                  <span className="felt-showdown-hand">{row.categoryLabel}</span>
+                  {row.payout > 0 ? (
+                    <span className="felt-showdown-payout accent">
+                      +{formatChips(row.payout)}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
 
-      <div className="felt-hole">
-        <p className="felt-label">Mis cartas</p>
+      {/* Zone: hole cards — drag-x flips them */}
+      <div ref={holeZoneRef} className="felt-hole zone-felt-hole">
+        <div className="felt-hole-head">
+          <p className="felt-label">Mis cartas</p>
+          <button
+            type="button"
+            className="ghost small"
+            aria-pressed={holeFaceDown}
+            onClick={flipHole}
+          >
+            {holeFaceDown ? 'Ver' : 'Ocultar'}
+          </button>
+        </div>
         <div className="cards">
           {(hand?.yourCards ?? [null, null]).map((card, i) => (
-            <PlayingCard key={i} card={card} faceDown={!card} size="lg" animate={card ? 'deal' : 'none'} />
+            <PlayingCard
+              key={`${holeFlips}-${i}`}
+              card={card}
+              faceDown={!card || holeFaceDown}
+              size="lg"
+              animate={holeFlips > 0 ? 'flip' : card ? 'deal' : 'none'}
+            />
           ))}
         </div>
+        <p className="meta small">Deslizá ← o → para dar vuelta las cartas</p>
       </div>
 
       <div className="felt-actionbar">
@@ -352,10 +444,10 @@ export function FeltView({
             className="raise"
             disabled={!canAggressive}
             whileTap={canAggressive ? { scale: 0.96 } : undefined}
-            onClick={() => fire(aggressive.kind, aggressive.amount)}
+            onClick={openAmountModal}
           >
             {aggressive.kind === 'bet' ? 'Bet' : 'Raise'}
-            <small>{formatChips(aggressive.amount)}</small>
+            <small>desde {formatChips(aggressive.amount)}</small>
           </motion.button>
 
           <motion.button
@@ -385,6 +477,21 @@ export function FeltView({
         </button>
       </div>
 
+      <BetAmountModal
+        open={pending === 'amount'}
+        stack={stack}
+        toCall={toCall}
+        currentBet={currentBet}
+        minRaise={minRaise}
+        bigBlind={bigBlind}
+        myBetThisRound={myBet}
+        pot={potTotal}
+        onCancel={closeModal}
+        onConfirm={(action, amount) => {
+          setPending(null);
+          onAction(action, amount);
+        }}
+      />
       <ConfirmModal
         open={pending === 'fold'}
         title="¿Ir al mazo?"

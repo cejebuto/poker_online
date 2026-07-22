@@ -5,6 +5,13 @@ export const SCRUB_STEP_PX = 24;
 /** Max movement while arming long-press scrub (px). */
 export const SCRUB_ARM_SLOP_PX = 8;
 export const SCRUB_ARM_MS = 280;
+/** Horizontal travel that flips the hole cards. Either direction flips. */
+export const SWIPE_FLIP_PX = 40;
+
+/** Hole-card flip: direction-agnostic, so left and right both turn the cards. */
+export function isSwipeFlip(dx: number, thresholdPx = SWIPE_FLIP_PX): boolean {
+  return Math.abs(dx) > thresholdPx;
+}
 
 /** Upward throw: positive dy = finger moved up. */
 export function isThrowConfirm(dyUp: number, thresholdPx = THROW_THRESHOLD_PX): boolean {

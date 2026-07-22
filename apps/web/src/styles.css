@@ -863,7 +863,8 @@ select {
   gap: 0.7rem;
 }
 
-.felt-community .cards {
+.felt-community .cards,
+.felt-community .community-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
@@ -1049,11 +1050,76 @@ select {
   text-align: center;
 }
 
+/* Own the horizontal axis for the flip swipe; the page keeps vertical scroll. */
+.felt-hole.zone-felt-hole {
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.felt-hole-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
 .felt-hole .cards {
   display: flex;
   justify-content: center;
   gap: 0.5rem;
   margin-top: 0.3rem;
+}
+
+.felt-showdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.felt-showdown-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.felt-showdown-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.55rem;
+  background: #0f172acc;
+  border: 1px solid transparent;
+}
+
+.felt-showdown-row.is-winner {
+  background: #14532dcc;
+  border-color: #22c55e;
+}
+
+.felt-showdown-row .cards {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.felt-showdown-who {
+  font-weight: 700;
+  min-width: 6rem;
+}
+
+.felt-showdown-hand {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+}
+
+.felt-showdown-payout {
+  margin-left: auto;
+  font-weight: 800;
 }
 
 .felt-actionbar {
@@ -1244,6 +1310,40 @@ select {
   .confirm-modal-panel {
     transform: none !important;
   }
+}
+
+/* Bet amount picker — taps + the native range, no drag zones */
+.zone-bet-modal {
+  touch-action: manipulation;
+}
+
+.bet-modal-panel {
+  width: min(24rem, 100%);
+}
+
+.bet-modal-amount {
+  margin: 0 0 0.25rem;
+  font-size: 2rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.bet-modal-range {
+  width: 100%;
+  margin: 0.5rem 0 0.75rem;
+  accent-color: #22c55e;
+  height: 2rem;
+}
+
+.bet-modal-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.bet-modal-custom {
+  margin-bottom: 0.6rem;
 }
 
 @media (min-width: 720px) {

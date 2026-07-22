@@ -10,8 +10,10 @@ import {
 } from '../src/chips/denominations.js';
 import {
   amountAfterScrubSteps,
+  isSwipeFlip,
   isThrowConfirm,
   scrubStepsFromDelta,
+  SWIPE_FLIP_PX,
   THROW_THRESHOLD_PX,
   throwProgress,
 } from '../src/chips/gestureMath.js';
@@ -111,5 +113,16 @@ describe('gestureMath (betting zones)', () => {
     assert.equal(amountAfterScrubSteps(100, 2, 50), 200);
     assert.equal(amountAfterScrubSteps(100, -1, 50), 50);
     assert.equal(amountAfterScrubSteps(100, 0, 50), 100);
+  });
+
+  it('flips hole cards on a swipe in either direction', () => {
+    assert.equal(isSwipeFlip(SWIPE_FLIP_PX + 1), true, 'swipe right');
+    assert.equal(isSwipeFlip(-(SWIPE_FLIP_PX + 1)), true, 'swipe left');
+  });
+
+  it('ignores a nudge that never reached the flip threshold', () => {
+    assert.equal(isSwipeFlip(SWIPE_FLIP_PX), false, 'exactly at the threshold is not a swipe');
+    assert.equal(isSwipeFlip(0), false);
+    assert.equal(isSwipeFlip(-12), false);
   });
 });

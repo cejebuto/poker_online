@@ -66,6 +66,8 @@ export type PublicPlayer = {
   connected: boolean;
   status?: 'ACTIVE' | 'FOLDED' | 'ALL_IN' | 'SITTING_OUT' | 'DISCONNECTED' | 'ELIMINATED';
   betThisRound?: number;
+  /** Every chip this player put into the current hand, across all streets. */
+  committedThisHand?: number;
   timeBankMs?: number;
   rebuyCount?: number;
   /** Accepted the next hand. */
@@ -125,6 +127,12 @@ export type PublicRoomState = {
   lastResult?: {
     payouts: Record<number, number>;
     winners: number[];
+    /**
+     * Hole cards of everyone who reached the end of the hand. Only present once
+     * the hand is COMPLETE. The key is `cards`, never `holeCards` — the privacy
+     * scanner treats that name as a leak by definition.
+     */
+    showdown?: { seat: number; cards: Card[] }[];
   };
   /** Progress toward the next hand, between hands. */
   nextHand?: {
