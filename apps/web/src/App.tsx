@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PublicRoomState, RoomSummary, WsServerEvent } from '@poker/shared';
 import { connectWs, type ConnectionStatus, type WsHandle } from './net/wsClient';
 import { clearSession, loadSession, saveSession } from './net/session';
+import { newClientActionId } from './net/id';
 import { UserGate } from './features/UserGate';
 import { Home } from './features/Home';
 import { CreateRoom } from './features/CreateRoom';
@@ -239,7 +240,7 @@ export function App() {
       handId: roomState.hand.handId,
       action,
       amount,
-      clientActionId: crypto.randomUUID(),
+      clientActionId: newClientActionId(),
     });
   };
 
