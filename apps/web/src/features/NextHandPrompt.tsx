@@ -1,4 +1,5 @@
 import type { PublicPlayer, PublicRoomState } from '@poker/shared';
+import { canPlayerRebuy } from './rebuy';
 
 /** Mirrors the server's readiness filter: who still has to accept. */
 function pending(players: PublicPlayer[]): PublicPlayer[] {
@@ -33,11 +34,13 @@ export function NextHandPrompt({
   playerId,
   onReady,
   onForceStart,
+  onRebuy,
 }: {
   state: PublicRoomState;
   playerId: string;
   onReady: (ready: boolean) => void;
   onForceStart: () => void;
+  onRebuy?: () => void;
 }) {
   const next = state.nextHand;
   if (!isBetweenHands(state) || !next) return null;
@@ -47,6 +50,7 @@ export function NextHandPrompt({
   const waiting = pending(state.players);
   const iAmWaited = waiting.some((p) => p.playerId === playerId);
   const enoughPlayers = next.needed >= 2;
+  const showRebuy = Boolean(onRebuy) && canPlayerRebuy(state, playerId);
 
   return (
     <section className="next-hand">
@@ -61,6 +65,10 @@ export function NextHandPrompt({
         <p className="meta">Faltan jugadores con fichas para repartir.</p>
       )}
 
+      {showRebuy ? (
+        <p className="meta">Te quedaste sin fichas. Recomprá para seguir jugando.</p>
+      ) : null}
+
       {waiting.length && enoughPlayers ? (
         <p className="meta">
           Esperando a {waiting.map((p) => p.displayName).join(', ')}
@@ -68,6 +76,12 @@ export function NextHandPrompt({
       ) : null}
 
       <div className="row">
+        {showRebuy ? (
+          <button type="button" className="primary" onClick={onRebuy}>
+            Recomprar
+          </button>
+        ) : null}
+
         {me && iAmWaited ? (
           <button type="button" className="primary" onClick={() => onReady(true)}>
             Jugar otra

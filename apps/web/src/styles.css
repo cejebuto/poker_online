@@ -1110,6 +1110,7 @@ select {
 .felt {
   --felt-green: #14663f;
   --felt-dark: #0a3a24;
+  position: relative;
   background: radial-gradient(ellipse at 50% 30%, var(--felt-green), var(--felt-dark) 70%, #061c12);
   border-radius: 0.9rem;
   padding: 0.7rem;
@@ -1117,6 +1118,120 @@ select {
   flex-direction: column;
   gap: 0.7rem;
   color: #e6f2ec;
+  isolation: isolate;
+}
+
+/* Full-screen-ish moving green border while it is your turn. */
+.felt.my-turn {
+  box-shadow:
+    0 0 0 2px #22c55e,
+    0 0 24px 2px #22c55e66,
+    inset 0 0 0 2px #4ade80aa;
+  animation: felt-turn-pulse 1.4s ease-in-out infinite;
+}
+
+.felt.my-turn::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: calc(0.9rem + 3px);
+  padding: 3px;
+  background: conic-gradient(
+    from var(--felt-turn-angle, 0deg),
+    #16a34a,
+    #4ade80,
+    #bbf7d0,
+    #22c55e,
+    #86efac,
+    #16a34a
+  );
+  animation: felt-turn-spin 2.2s linear infinite;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 5;
+}
+
+@property --felt-turn-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes felt-turn-spin {
+  to {
+    --felt-turn-angle: 360deg;
+  }
+}
+
+@keyframes felt-turn-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px #22c55e,
+      0 0 16px 1px #22c55e55,
+      inset 0 0 0 2px #4ade8088;
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px #4ade80,
+      0 0 32px 4px #22c55e88,
+      inset 0 0 0 3px #86efaccc;
+  }
+}
+
+.felt-your-turn {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  align-self: center;
+  margin: -0.15rem auto 0.1rem;
+  padding: 0.35rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #052e16;
+  background: linear-gradient(90deg, #4ade80, #86efac, #4ade80);
+  background-size: 200% 100%;
+  border: 2px solid #bbf7d0;
+  box-shadow:
+    0 0 0 2px #14532d88,
+    0 8px 24px #22c55e66;
+  animation: felt-your-turn-flash 1.1s ease-in-out infinite;
+}
+
+@keyframes felt-your-turn-flash {
+  0%,
+  100% {
+    transform: scale(1);
+    background-position: 0% 50%;
+    box-shadow:
+      0 0 0 2px #14532d88,
+      0 8px 24px #22c55e66;
+  }
+  50% {
+    transform: scale(1.06);
+    background-position: 100% 50%;
+    box-shadow:
+      0 0 0 3px #14532daa,
+      0 12px 36px #4ade80aa;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .felt.my-turn,
+  .felt.my-turn::before,
+  .felt-your-turn {
+    animation: none;
+  }
 }
 
 .felt-top {
@@ -1258,7 +1373,32 @@ select {
   background: #04120ccc;
   border: 1px solid #1f7a4d;
   border-radius: 0.6rem;
-  padding: 0.55rem 0.7rem;
+  padding: 0.45rem 0.7rem;
+}
+
+.felt-status-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.15rem 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.felt-status-toggle .felt-label {
+  margin: 0;
+}
+
+.felt-status-chevron {
+  color: #4ade80;
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 .felt-status dl {
@@ -1277,6 +1417,45 @@ select {
 .felt-status dd {
   margin: 0;
   text-align: right;
+  font-weight: 600;
+}
+
+.felt-rebuy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.6rem;
+  background: #14532dcc;
+  border: 1px solid #4ade80;
+}
+
+.felt-rebuy .meta {
+  margin: 0;
+}
+
+.felt-result {
+  text-align: center;
+  margin: 0;
+}
+
+.felt > .turn-timer {
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.55rem;
+  background: #04120ccc;
+  border: 1px solid #1f7a4d;
+}
+
+.felt > .turn-timer.mine {
+  border-color: #4ade80;
+  box-shadow: 0 0 12px #22c55e44;
+}
+
+.felt > .turn-timer .meta {
+  color: #bbf7d0;
   font-weight: 600;
 }
 
@@ -1810,11 +1989,17 @@ select {
   will-change: transform;
 }
 
-.win-banner {
+/* Flex center so Motion scale on `.win-banner` cannot steal the translate. */
+.win-banner-anchor {
   position: absolute;
-  left: 50%;
-  top: 38%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.win-banner {
   display: flex;
   flex-direction: column;
   align-items: center;

@@ -56,15 +56,19 @@ export function WinCelebration({
         />
       ))}
 
-      <motion.div
-        className="win-banner"
-        initial={{ scale: 0.7, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 18 }}
-      >
-        <strong className="win-banner-title">¡Ganaste!</strong>
-        <span className="win-banner-amount">{formatChips(payout)}</span>
-      </motion.div>
+      {/* Wrapper owns the centering; Motion's transform on the banner must not
+          override `translate(-50%, -50%)` or the message sits off-screen. */}
+      <div className="win-banner-anchor">
+        <motion.div
+          className="win-banner"
+          initial={{ scale: 0.7, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 18 }}
+        >
+          <strong className="win-banner-title">¡Ganaste!</strong>
+          <span className="win-banner-amount">{formatChips(payout)}</span>
+        </motion.div>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { PublicRoomState } from '@poker/shared';
 import { NextHandPrompt } from './NextHandPrompt';
+import { canPlayerRebuy } from './rebuy';
 
 export function Lobby({
   state,
@@ -19,19 +20,12 @@ export function Lobby({
   onRebuy?: () => void;
 }) {
   const isHost = state.hostPlayerId === playerId;
-  const me = state.players.find((p) => p.playerId === playerId);
   const canStart =
     isHost &&
     state.phase === 'LOBBY' &&
     state.players.filter((p) => p.role !== 'mesa' && (p.stack ?? 0) > 0 && p.status !== 'ELIMINATED')
       .length >= 2;
-  const canRebuy =
-    state.config.mode === 'cash' &&
-    state.config.allowRebuy &&
-    state.phase === 'LOBBY' &&
-    me &&
-    (me.stack === 0 || me.status === 'SITTING_OUT') &&
-    (me.rebuyCount ?? 0) < (state.config.rebuyMax ?? 0);
+  const canRebuy = Boolean(onRebuy) && canPlayerRebuy(state, playerId);
 
   return (
     <section className="panel wide">
@@ -132,7 +126,7 @@ export function Lobby({
         ) : state.phase === 'LOBBY' && !state.lastResult ? (
           <p className="muted">Esperando al host…</p>
         ) : null}
-        {canRebuy && onRebuy ? (
+        {canRebuy ? (
           <button type="button" className="primary" onClick={onRebuy}>
             Recomprar
           </button>

@@ -22,9 +22,17 @@ import {
   saveEquityEnabled,
   useEquity,
 } from '../probability/useEquity';
+import { canPlayerRebuy } from './rebuy';
 import { buildShowdownRows, describeMyHand, describeWinnerHeadline } from './showdown';
+import { TurnTimer } from './TurnTimer';
 import { WinCelebration } from './WinCelebration';
 import { formatChips, handCounts, potOdds, streetLabel } from './feltStats';
+
+/** Mobile breakpoint matches the felt-board 2-col layout (`min-width: 720px`). */
+function isMobileViewport(): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return true;
+  return window.matchMedia('(max-width: 719px)').matches;
+}
 
 type ActionName = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
 
@@ -50,6 +58,7 @@ export function FeltView({
   onGoToLobby,
   onOpenThemes,
   onSwitchView,
+  onRebuy,
 }: {
   state: PublicRoomState;
   playerId: string;
@@ -60,11 +69,14 @@ export function FeltView({
   onGoToLobby: () => void;
   onOpenThemes: () => void;
   onSwitchView: () => void;
+  onRebuy?: () => void;
 }) {
   const { play } = useJuice();
   const [pending, setPending] = useState<PendingConfirm>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [feltTheme, setFeltTheme] = useState(() => loadFeltTheme());
+  // Hand status is noise on a phone; start collapsed on mobile, open on desktop.
+  const [statusOpen, setStatusOpen] = useState(() => !isMobileViewport());
   const stackTargetRef = useRef<HTMLDivElement>(null);
   const hand = state.hand;
   const me = state.players.find((p) => p.playerId === playerId);
@@ -75,6 +87,10 @@ export function FeltView({
   // The table is waiting to deal: the prompt takes the card area and the action
   // buttons make no sense, so both give way to the seat list.
   const betweenHands = isBetweenHands(state) && Boolean(nextHandSlot);
+  const showRebuy = Boolean(onRebuy) && canPlayerRebuy(state, playerId);
+  const hasTurnTimer = Boolean(
+    hand?.turnTimeoutMs && hand.turnTimeoutMs > 0 && !handOver && hand.currentToAct !== null,
+  );
 
   // Drop pending confirms if the turn ends under the modal.
   useEffect(() => {
@@ -250,11 +266,17 @@ export function FeltView({
 
   return (
     <section
-      className="felt"
+      className={`felt${isMyTurn ? ' my-turn' : ''}`}
       style={
         { '--felt-green': feltTheme.green, '--felt-dark': feltTheme.dark } as CSSProperties
       }
     >
+      {isMyTurn ? (
+        <div className="felt-your-turn" role="status" aria-live="assertive">
+          Tu turno
+        </div>
+      ) : null}
+
       <header className="felt-top">
         <div className="felt-blinds">
           Blinds <b>{state.effectiveSmallBlind}</b>/<b>{state.effectiveBigBlind}</b>
@@ -278,6 +300,16 @@ export function FeltView({
         </button>
       </header>
 
+      {hasTurnTimer ? (
+        <TurnTimer
+          turnStartedAt={hand?.turnStartedAt}
+          turnTimeoutMs={hand?.turnTimeoutMs}
+          timeBankMs={hand?.actorTimeBankMs}
+          isMyTurn={isMyTurn}
+          active
+        />
+      ) : null}
+
       <div className="felt-board">
         <div className="felt-community">
           <p className="felt-label">Cartas comunitarias</p>
@@ -298,24 +330,55 @@ export function FeltView({
           />
         </div>
 
-        <aside className="felt-status">
-          <p className="felt-label">Estado de la mano</p>
-          <dl>
-            <dt>Calle actual</dt>
-            <dd className="accent">{streetLabel(hand?.phase)}</dd>
-            <dt>Jugadores en mano</dt>
-            <dd>
-              {counts.inHand} / {counts.seated}
-            </dd>
-            <dt>Última acción</dt>
-            <dd>{lastAction ?? '—'}</dd>
-            <dt>Apuesta más alta</dt>
-            <dd>{formatChips(currentBet)}</dd>
-            <dt>Mi apuesta</dt>
-            <dd className="info">{formatChips(myCommitted)}</dd>
-          </dl>
+        <aside className={`felt-status${statusOpen ? ' is-open' : ' is-collapsed'}`}>
+          <button
+            type="button"
+            className="felt-status-toggle"
+            aria-expanded={statusOpen}
+            onClick={() => {
+              setStatusOpen((v) => !v);
+              play('tick');
+            }}
+          >
+            <span className="felt-label">Estado de la mano</span>
+            <span className="felt-status-chevron" aria-hidden="true">
+              {statusOpen ? '▾' : '▸'}
+            </span>
+          </button>
+          {statusOpen ? (
+            <dl>
+              <dt>Calle actual</dt>
+              <dd className="accent">{streetLabel(hand?.phase)}</dd>
+              <dt>Jugadores en mano</dt>
+              <dd>
+                {counts.inHand} / {counts.seated}
+              </dd>
+              <dt>Última acción</dt>
+              <dd>{lastAction ?? '—'}</dd>
+              <dt>Apuesta más alta</dt>
+              <dd>{formatChips(currentBet)}</dd>
+              <dt>Mi apuesta</dt>
+              <dd className="info">{formatChips(myCommitted)}</dd>
+            </dl>
+          ) : null}
         </aside>
       </div>
+
+      {showRebuy && !betweenHands ? (
+        <div className="felt-rebuy">
+          <p className="meta">Te quedaste sin fichas.</p>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => {
+              play('confirm');
+              onRebuy?.();
+            }}
+          >
+            Recomprar
+          </button>
+        </div>
+      ) : null}
 
       <ul className="felt-seats felt-scroll">
         {opponents.map((p) => (
@@ -347,7 +410,7 @@ export function FeltView({
 
       {resultText ? (
         <section className="felt-showdown">
-          <p className="result">{resultText}</p>
+          <p className="result felt-result">{resultText}</p>
           {showdownRows.length ? (
             <ul className="felt-showdown-list felt-scroll">
               {showdownRows.map((row) => (

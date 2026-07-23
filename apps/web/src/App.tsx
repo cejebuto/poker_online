@@ -389,12 +389,14 @@ export function App() {
                     setNotice('');
                     send({ type: 'hand:start' });
                   }}
+                  onRebuy={() => send({ type: 'player:rebuy' })}
                 />
               }
               onGoToLobby={() => setScreen('lobby')}
               onOpenThemes={() => openThemes('play')}
               onSwitchView={() => switchPlayView('classic')}
               onAction={(action, amount) => sendPlayerAction(action, amount)}
+              onRebuy={() => send({ type: 'player:rebuy' })}
             />
           ) : (
             <>
@@ -413,6 +415,7 @@ export function App() {
                   setNotice('');
                   send({ type: 'hand:start' });
                 }}
+                onRebuy={() => send({ type: 'player:rebuy' })}
               />
             </>
           )}
