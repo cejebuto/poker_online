@@ -1,7 +1,7 @@
 import { useDrag } from '@use-gesture/react';
 import { motion } from 'motion/react';
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import type { PublicRoomState } from '@poker/shared';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import type { PublicPlayer, PublicRoomState } from '@poker/shared';
 import { CommunityRow, PlayingCard } from '../cards/PlayingCard';
 import { isSwipeFlip } from '../chips/gestureMath';
 import { useJuice } from '../juice/useJuice';
@@ -23,31 +23,26 @@ import {
   useEquity,
 } from '../probability/useEquity';
 import { canPlayerRebuy } from './rebuy';
+import { layoutOpponentsForHero } from './opponentLayout';
+import { SEAT_CHIPS, SeatChip, seatChipByToken } from './SeatChip';
 import { buildShowdownRows, describeMyHand, describeWinnerHeadline } from './showdown';
 import { TurnTimer } from './TurnTimer';
 import { WinCelebration } from './WinCelebration';
 import { formatChips, handCounts, potOdds, streetLabel } from './feltStats';
-
-/** Mobile breakpoint matches the felt-board 2-col layout (`min-width: 720px`). */
-function isMobileViewport(): boolean {
-  if (typeof window === 'undefined' || !window.matchMedia) return true;
-  return window.matchMedia('(max-width: 719px)').matches;
-}
 
 type ActionName = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
 
 type PendingConfirm = 'fold' | 'all-in' | 'amount' | null;
 
 /**
- * Zone map (Vista Mesa — one continuous gesture only, the rest are taps):
+ * Player felt — 3 fixed viewport zones (mobile-first):
  *
  * felt
- * ├── [pots-zone]     display only — magnet/vanish on hand result
- * ├── [hole-zone]     drag-x → flip my cards (the only drag on this screen)
- * ├── [stack-target]  bottom stats (magnet destination)
- * ├── [actionbar]     tap zones (see buttons)
- * ├── [showdown]      display only, after the hand — own scroll container
- * └── [modals]        overlay taps + native inputs
+ * ├── Z1 cartas (~20%)     street + community + menu + timer
+ * ├── Z2 oponentes (~40%)  left 4 | pot | right 4 (+ showdown scroll)
+ * └── Z3 mi zona (~40%)    hole (drag-x flip) + stack + actions
+ *
+ * Logic (actions, pot credit, equity, modals) is unchanged; only layout moves.
  */
 export function FeltView({
   state,
@@ -75,8 +70,6 @@ export function FeltView({
   const [pending, setPending] = useState<PendingConfirm>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [feltTheme, setFeltTheme] = useState(() => loadFeltTheme());
-  // Hand status is noise on a phone; start collapsed on mobile, open on desktop.
-  const [statusOpen, setStatusOpen] = useState(() => !isMobileViewport());
   const stackTargetRef = useRef<HTMLDivElement>(null);
   const hand = state.hand;
   const me = state.players.find((p) => p.playerId === playerId);
@@ -84,37 +77,30 @@ export function FeltView({
   const handOver = !hand || hand.phase === 'COMPLETE';
   const isMyTurn = Boolean(hand && hand.currentToAct === mySeat && !handOver);
   const iAmButton = mySeat !== null && hand?.button === mySeat;
-  // The table is waiting to deal: the prompt takes the card area and the action
-  // buttons make no sense, so both give way to the seat list.
   const betweenHands = isBetweenHands(state) && Boolean(nextHandSlot);
   const showRebuy = Boolean(onRebuy) && canPlayerRebuy(state, playerId);
   const hasTurnTimer = Boolean(
     hand?.turnTimeoutMs && hand.turnTimeoutMs > 0 && !handOver && hand.currentToAct !== null,
   );
 
-  // Drop pending confirms if the turn ends under the modal.
   useEffect(() => {
     if (!isMyTurn) setPending(null);
   }, [isMyTurn]);
 
   const toCall = hand && me ? Math.max(0, hand.currentBet - (me.betThisRound ?? 0)) : 0;
   const myBet = me?.betThisRound ?? 0;
-  const myCommitted = me?.committedThisHand ?? 0;
   const stack = me?.stack ?? 0;
   const currentBet = hand?.currentBet ?? 0;
   const minRaise = hand?.minRaise ?? state.effectiveBigBlind;
   const bigBlind = state.effectiveBigBlind;
 
   const pots = hand?.pots ?? [];
-  // potTotal is authoritative while betting is live; `pots` only fills in at showdown.
   const potTotal = hand?.potTotal ?? 0;
   const counts = handCounts(state.players);
   const odds = potOdds(potTotal, toCall);
 
-  // Server stack already includes payouts; animate from pre-payout base.
   const result = state.lastResult;
-  const myPayout =
-    result && mySeat !== null ? (result.payouts[mySeat] ?? 0) : 0;
+  const myPayout = result && mySeat !== null ? (result.payouts[mySeat] ?? 0) : 0;
   const celebrating = Boolean(result && handOver && (hand?.phase === 'COMPLETE' || result));
   const [credited, setCredited] = useState(0);
   const creditToken = useRef<string | null>(null);
@@ -128,8 +114,6 @@ export function FeltView({
     if (!celebrating) setCredited(0);
   }, [hand?.handId, celebrating]);
 
-  // Celebrate a win once per hand: the token stops re-renders from replaying it,
-  // the same trick `creditToken` uses above.
   const [celebratedHand, setCelebratedHand] = useState<string | null>(null);
   const [partyOpen, setPartyOpen] = useState(false);
   useEffect(() => {
@@ -152,15 +136,14 @@ export function FeltView({
     [play],
   );
 
-  const stackShown = celebrating
-    ? Math.max(0, stack - myPayout + credited)
-    : stack;
+  const stackShown = celebrating ? Math.max(0, stack - myPayout + credited) : stack;
 
-  const opponents = state.players.filter(
-    (p) => p.playerId !== playerId && p.role !== 'mesa' && p.seat !== null,
+  const columns = useMemo(
+    () => layoutOpponentsForHero(state.players, playerId),
+    [state.players, playerId],
   );
 
-  // --- Zone: hole cards (drag-x → flip). Swiping either way turns them over. ---
+  // --- Zone: hole cards (drag-x → flip). ---
   const holeZoneRef = useRef<HTMLDivElement>(null);
   const [holeFaceDown, setHoleFaceDown] = useState(false);
   const [holeFlips, setHoleFlips] = useState(0);
@@ -171,7 +154,6 @@ export function FeltView({
     play('tick');
   }, [play]);
 
-  // A new deal always arrives face up, whatever the last hand ended on.
   useEffect(() => {
     setHoleFaceDown(false);
   }, [hand?.handId]);
@@ -189,8 +171,6 @@ export function FeltView({
     },
   );
 
-  // Covering the cards has to cover what gives them away: the hand name and the
-  // equity read out my hole cards just as loudly as the cards themselves.
   const myHandName = holeFaceDown ? null : describeMyHand(hand?.yourCards, hand?.community ?? []);
 
   const [equityOn, setEquityOn] = useState(() => loadEquityEnabled());
@@ -264,6 +244,8 @@ export function FeltView({
     }
   };
 
+  const street = streetLabel(hand?.phase);
+
   return (
     <section
       className={`felt${isMyTurn ? ' my-turn' : ''}`}
@@ -271,337 +253,318 @@ export function FeltView({
         { '--felt-green': feltTheme.green, '--felt-dark': feltTheme.dark } as CSSProperties
       }
     >
-      {isMyTurn ? (
-        <div className="felt-your-turn" role="status" aria-live="assertive">
-          Tu turno
-        </div>
-      ) : null}
-
-      <header className="felt-top">
-        <div className="felt-blinds">
-          Blinds <b>{state.effectiveSmallBlind}</b>/<b>{state.effectiveBigBlind}</b>
-        </div>
-        {/* The seat list never includes me, so my own button would be invisible. */}
-        {iAmButton ? (
-          <span className="felt-dealer felt-dealer-me" title="Sos el dealer">
-            D
+      {/* ——— Z1: Cartas (~20%) ——— */}
+      <div className="felt-z1">
+        <header className="felt-z1-top">
+          <span className="felt-blinds-pill">
+            {state.effectiveSmallBlind}/{state.effectiveBigBlind}
           </span>
-        ) : null}
-        <button
-          type="button"
-          className="felt-menu"
-          aria-label="Menú de mesa"
-          onClick={() => {
-            setMenuOpen(true);
-            play('tick');
-          }}
-        >
-          ☰
-        </button>
-      </header>
-
-      {hasTurnTimer ? (
-        <TurnTimer
-          turnStartedAt={hand?.turnStartedAt}
-          turnTimeoutMs={hand?.turnTimeoutMs}
-          timeBankMs={hand?.actorTimeBankMs}
-          isMyTurn={isMyTurn}
-          active
-        />
-      ) : null}
-
-      <div className="felt-board">
-        <div className="felt-community">
-          <p className="felt-label">Cartas comunitarias</p>
-          {/* Always five slots: undealt streets sit face down until they turn. */}
-          {/* 1.3 is the ceiling: five 44px cards plus gaps must fit the ~320px of
-              usable width a 375px phone leaves inside the felt, or the row wraps. */}
-          <CommunityRow cards={hand?.community ?? []} size="sm" max={5} pad halfScale={1.3} />
-
-          <FeltPotDisplay
-            pots={pots}
-            potTotal={potTotal}
-            mySeat={mySeat}
-            result={celebrating ? result : null}
-            handId={hand?.handId}
-            stackTargetRef={stackTargetRef}
-            onCredit={onPotCredit}
-            onFlightJuice={onFlightJuice}
-          />
-        </div>
-
-        <aside className={`felt-status${statusOpen ? ' is-open' : ' is-collapsed'}`}>
+          <span className="felt-street-badge" aria-live="polite">
+            {street}
+          </span>
           <button
             type="button"
-            className="felt-status-toggle"
-            aria-expanded={statusOpen}
+            className="felt-menu"
+            aria-label="Menú de mesa"
             onClick={() => {
-              setStatusOpen((v) => !v);
+              setMenuOpen(true);
               play('tick');
             }}
           >
-            <span className="felt-label">Estado de la mano</span>
-            <span className="felt-status-chevron" aria-hidden="true">
-              {statusOpen ? '▾' : '▸'}
-            </span>
+            ☰
           </button>
-          {statusOpen ? (
-            <dl>
-              <dt>Calle actual</dt>
-              <dd className="accent">{streetLabel(hand?.phase)}</dd>
-              <dt>Jugadores en mano</dt>
-              <dd>
-                {counts.inHand} / {counts.seated}
-              </dd>
-              <dt>Última acción</dt>
-              <dd>{lastAction ?? '—'}</dd>
-              <dt>Apuesta más alta</dt>
-              <dd>{formatChips(currentBet)}</dd>
-              <dt>Mi apuesta</dt>
-              <dd className="info">{formatChips(myCommitted)}</dd>
-            </dl>
-          ) : null}
-        </aside>
+        </header>
+
+        {hasTurnTimer ? (
+          <TurnTimer
+            turnStartedAt={hand?.turnStartedAt}
+            turnTimeoutMs={hand?.turnTimeoutMs}
+            timeBankMs={hand?.actorTimeBankMs}
+            isMyTurn={isMyTurn}
+            active
+          />
+        ) : null}
+
+        <div className="felt-community">
+          <CommunityRow cards={hand?.community ?? []} size="sm" max={5} pad halfScale={1.25} />
+        </div>
+
+        {lastAction ? <p className="felt-last-action">{lastAction}</p> : null}
       </div>
 
-      {showRebuy && !betweenHands ? (
-        <div className="felt-rebuy">
-          <p className="meta">Te quedaste sin fichas.</p>
-          <button
-            type="button"
-            className="primary"
-            onClick={() => {
-              play('confirm');
-              onRebuy?.();
-            }}
-          >
-            Recomprar
-          </button>
+      {/* ——— Z2: Jugadores y apuestas (~40%) ——— */}
+      <div className="felt-z2">
+        <div className="felt-z2-grid">
+          <ul className="felt-rail felt-rail--left" aria-label="Asientos izquierda">
+            {columns.left.map((p, i) =>
+              p ? (
+                <FeltSeatPill
+                  key={p.playerId}
+                  player={p}
+                  acting={hand?.currentToAct === p.seat}
+                  isButton={hand?.button === p.seat}
+                />
+              ) : (
+                <li key={`L${i}`} className="felt-seat-slot" aria-hidden />
+              ),
+            )}
+          </ul>
+
+          <div className="felt-z2-center">
+            <FeltPotDisplay
+              pots={pots}
+              potTotal={potTotal}
+              mySeat={mySeat}
+              result={celebrating ? result : null}
+              handId={hand?.handId}
+              stackTargetRef={stackTargetRef}
+              onCredit={onPotCredit}
+              onFlightJuice={onFlightJuice}
+            />
+            {resultText ? <p className="felt-result-mini">{resultText}</p> : null}
+          </div>
+
+          <ul className="felt-rail felt-rail--right" aria-label="Asientos derecha">
+            {columns.right.map((p, i) =>
+              p ? (
+                <FeltSeatPill
+                  key={p.playerId}
+                  player={p}
+                  acting={hand?.currentToAct === p.seat}
+                  isButton={hand?.button === p.seat}
+                />
+              ) : (
+                <li key={`R${i}`} className="felt-seat-slot" aria-hidden />
+              ),
+            )}
+          </ul>
         </div>
-      ) : null}
 
-      <ul className="felt-seats felt-scroll">
-        {opponents.map((p) => (
-          <li
-            key={p.playerId}
-            className={`felt-seat${hand?.currentToAct === p.seat ? ' acting' : ''}${
-              p.status === 'FOLDED' ? ' folded' : ''
-            }`}
-          >
-            <span className="felt-avatar" aria-hidden="true">
-              {p.avatar ?? '👤'}
-            </span>
-            <span className="felt-seat-info">
-              <span className="felt-seat-name">
-                {hand?.currentToAct === p.seat ? '▸ ' : ''}
-                {p.displayName}
-                {hand?.button === p.seat ? <span className="felt-dealer">D</span> : null}
-              </span>
-              <span className="felt-seat-stack">{formatChips(p.stack)}</span>
-              {p.betThisRound ? (
-                <span className="felt-seat-bet">Bet {formatChips(p.betThisRound)}</span>
-              ) : p.status === 'FOLDED' ? (
-                <span className="felt-seat-bet muted">Fold</span>
-              ) : null}
-            </span>
-          </li>
-        ))}
-      </ul>
+        {showdownRows.length > 0 ? (
+          <ul className="felt-showdown-list felt-scroll">
+            {showdownRows.map((row) => (
+              <li
+                key={row.seat}
+                className={`felt-showdown-row${row.isWinner ? ' is-winner' : ''}`}
+              >
+                <span className="felt-showdown-who">
+                  {row.avatar ? `${row.avatar} ` : ''}
+                  {row.name}
+                </span>
+                <span className="cards">
+                  {row.cards.map((card, i) => (
+                    <PlayingCard
+                      key={i}
+                      card={card}
+                      size="sm"
+                      halfScale={1.15}
+                      animate="reveal"
+                    />
+                  ))}
+                </span>
+                <span className="felt-showdown-hand">{row.categoryLabel}</span>
+                {row.payout > 0 ? (
+                  <span className="felt-showdown-payout accent">+{formatChips(row.payout)}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
 
-      {resultText ? (
-        <section className="felt-showdown">
-          <p className="result felt-result">{resultText}</p>
-          {showdownRows.length ? (
-            <ul className="felt-showdown-list felt-scroll">
-              {showdownRows.map((row) => (
-                <li
-                  key={row.seat}
-                  className={`felt-showdown-row${row.isWinner ? ' is-winner' : ''}`}
-                >
-                  <span className="felt-showdown-who">
-                    {row.avatar ? `${row.avatar} ` : ''}
-                    {row.name}
-                  </span>
-                  <span className="cards">
-                    {row.cards.map((card, i) => (
-                      <PlayingCard
-                        key={i}
-                        card={card}
-                        size="sm"
-                        halfScale={1.3}
-                        animate="reveal"
-                      />
-                    ))}
-                  </span>
-                  <span className="felt-showdown-hand">{row.categoryLabel}</span>
-                  {row.payout > 0 ? (
-                    <span className="felt-showdown-payout accent">
-                      +{formatChips(row.payout)}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      ) : null}
-
-      {betweenHands ? (
-        nextHandSlot
-      ) : (
-        /* Zone: hole cards — drag-x flips them */
-        <div ref={holeZoneRef} className="felt-hole zone-felt-hole">
-          <div className="felt-hole-head">
-            <p className="felt-label">Mis cartas</p>
+      {/* ——— Z3: Mi zona (~40%) ——— */}
+      <div className="felt-z3">
+        <div className="felt-z3-chrome">
+          {!betweenHands ? (
             <button
               type="button"
-              className="ghost small"
+              className="felt-hide-btn"
               aria-pressed={holeFaceDown}
               onClick={flipHole}
             >
               {holeFaceDown ? 'Ver' : 'Ocultar'}
             </button>
-          </div>
-          <div className="cards">
-            {(hand?.yourCards ?? [null, null]).map((card, i) => (
-              <PlayingCard
-                key={`${holeFlips}-${i}`}
-                card={card}
-                faceDown={!card || holeFaceDown}
-                size="lg"
-                halfScale={1.35}
-                animate={holeFlips > 0 ? 'flip' : card ? 'deal' : 'none'}
-              />
-            ))}
-          </div>
-          <p className="meta small">Deslizá ← o → para dar vuelta las cartas</p>
-          {/* Always rendered: dropping the line made everything below it jump. */}
-          <p className="felt-my-hand accent">{myHandName ?? '•••'}</p>
-        </div>
-      )}
+          ) : (
+            <span className="felt-hide-btn felt-hide-btn--ghost" aria-hidden />
+          )}
 
-      <div className="felt-actionbar">
-        <div className="felt-stats zone-felt-stats">
-          <div>
-            <span className="felt-label">To call</span>
-            <strong>{formatChips(toCall)}</strong>
-          </div>
-          <div ref={stackTargetRef} className="felt-stack-target zone-felt-stack">
-            <span className="felt-label">Tu stack</span>
-            <motion.strong
-              className="accent"
-              key={stackShown}
-              initial={celebrating && credited > 0 ? { scale: 1.12 } : false}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 22 }}
-            >
-              {formatChips(stackShown)}
-            </motion.strong>
-          </div>
-          <div>
+          {isMyTurn ? (
+            <div className="felt-your-turn" role="status" aria-live="assertive">
+              Tu turno
+            </div>
+          ) : (
+            <span className="felt-turn-spacer" aria-hidden />
+          )}
+
+          {iAmButton ? (
+            <span className="felt-dealer felt-dealer-me" title="Sos el dealer">
+              D
+            </span>
+          ) : (
+            <span className="felt-dealer-spacer" aria-hidden />
+          )}
+        </div>
+
+        {showRebuy && !betweenHands ? (
+          <div className="felt-rebuy">
+            <p className="meta">Te quedaste sin fichas.</p>
             <button
               type="button"
-              className="felt-equity"
-              aria-pressed={equityOn}
+              className="primary"
               onClick={() => {
-                const next = !equityOn;
-                setEquityOn(next);
-                saveEquityEnabled(next);
-                play('tick');
+                play('confirm');
+                onRebuy?.();
               }}
             >
-              <span className="felt-label">Equity</span>
-              <strong className="warn">
-                {holeFaceDown
-                  ? '•••'
-                  : !equityOn
-                    ? 'off'
-                    : equity.calculating
-                      ? '…'
-                      : equity.result
-                        ? `${equity.result.winPct.toFixed(0)}%`
-                        : '—'}
-              </strong>
+              Recomprar
             </button>
           </div>
-          <div>
-            <span className="felt-label">Pot odds</span>
-            <strong className="info">{odds ?? '—'}</strong>
+        ) : null}
+
+        {betweenHands ? (
+          <div className="felt-between">{nextHandSlot}</div>
+        ) : (
+          <div className="felt-z3-body">
+            <div ref={holeZoneRef} className="felt-hole zone-felt-hole">
+              <div className="cards">
+                {(hand?.yourCards ?? [null, null]).map((card, i) => (
+                  <PlayingCard
+                    key={`${holeFlips}-${i}`}
+                    card={card}
+                    faceDown={!card || holeFaceDown}
+                    size="lg"
+                    halfScale={1.35}
+                    animate={holeFlips > 0 ? 'flip' : card ? 'deal' : 'none'}
+                  />
+                ))}
+              </div>
+              <div className="felt-hole-side">
+                <div ref={stackTargetRef} className="felt-stack-target zone-felt-stack">
+                  <span className="felt-label">Tu stack</span>
+                  <motion.strong
+                    className="accent"
+                    key={stackShown}
+                    initial={celebrating && credited > 0 ? { scale: 1.12 } : false}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+                  >
+                    {formatChips(stackShown)}
+                  </motion.strong>
+                </div>
+                <p className="felt-my-hand accent">{myHandName ?? '•••'}</p>
+              </div>
+            </div>
+
+            <div className="felt-actionbar">
+              <div className="felt-stats zone-felt-stats">
+                <div>
+                  <span className="felt-label">Equity</span>
+                  <button
+                    type="button"
+                    className="felt-equity"
+                    aria-pressed={equityOn}
+                    onClick={() => {
+                      const next = !equityOn;
+                      setEquityOn(next);
+                      saveEquityEnabled(next);
+                      play('tick');
+                    }}
+                  >
+                    <strong className="warn">
+                      {holeFaceDown
+                        ? '•••'
+                        : !equityOn
+                          ? 'off'
+                          : equity.calculating
+                            ? '…'
+                            : equity.result
+                              ? `${equity.result.winPct.toFixed(0)}%`
+                              : '—'}
+                    </strong>
+                  </button>
+                </div>
+                <div>
+                  <span className="felt-label">Pot odds</span>
+                  <strong className="info">{odds ?? '—'}</strong>
+                </div>
+                <div>
+                  <span className="felt-label">To call</span>
+                  <strong>{formatChips(toCall)}</strong>
+                </div>
+              </div>
+
+              <div className="felt-buttons zone-felt-actions">
+                {passive === 'check' ? (
+                  <motion.button
+                    type="button"
+                    className="check"
+                    disabled={!isMyTurn}
+                    whileTap={isMyTurn ? { scale: 0.96 } : undefined}
+                    onClick={() => fire('check')}
+                  >
+                    Check
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    type="button"
+                    className="fold"
+                    disabled={!isMyTurn}
+                    whileTap={isMyTurn ? { scale: 0.96 } : undefined}
+                    onClick={() => fire('fold')}
+                  >
+                    Fold
+                  </motion.button>
+                )}
+
+                {toCall > 0 ? (
+                  <motion.button
+                    type="button"
+                    className="call"
+                    disabled={!canCall}
+                    whileTap={canCall ? { scale: 0.96 } : undefined}
+                    onClick={() => fire('call')}
+                  >
+                    Call
+                    <small>{formatChips(toCall)}</small>
+                  </motion.button>
+                ) : (
+                  <span className="felt-btn-spacer" aria-hidden="true" />
+                )}
+
+                <motion.button
+                  type="button"
+                  className="raise"
+                  disabled={!canAggressive}
+                  whileTap={canAggressive ? { scale: 0.96 } : undefined}
+                  onClick={openAmountModal}
+                >
+                  {aggressive.kind === 'bet' ? 'Bet' : 'Raise'}
+                  <small>desde {formatChips(aggressive.amount)}</small>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  className="triple"
+                  disabled={!canTriple}
+                  whileTap={canTriple ? { scale: 0.96 } : undefined}
+                  onClick={() => fire(triple.kind, triple.amount)}
+                >
+                  x3
+                  <small>{formatChips(triple.amount)}</small>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  className="custom"
+                  disabled={!canAllIn}
+                  whileTap={canAllIn ? { scale: 0.96 } : undefined}
+                  onClick={() => fire('all-in')}
+                >
+                  All-in
+                </motion.button>
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Zone: action taps only — touch-action manipulation */}
-        {betweenHands ? null : (
-        <div className="felt-buttons zone-felt-actions">
-          {passive === 'check' ? (
-            <motion.button
-              type="button"
-              className="check"
-              disabled={!isMyTurn}
-              whileTap={isMyTurn ? { scale: 0.96 } : undefined}
-              onClick={() => fire('check')}
-            >
-              Check
-            </motion.button>
-          ) : (
-            <motion.button
-              type="button"
-              className="fold"
-              disabled={!isMyTurn}
-              whileTap={isMyTurn ? { scale: 0.96 } : undefined}
-              onClick={() => fire('fold')}
-            >
-              Fold
-            </motion.button>
-          )}
-
-          {toCall > 0 ? (
-            <motion.button
-              type="button"
-              className="call"
-              disabled={!canCall}
-              whileTap={canCall ? { scale: 0.96 } : undefined}
-              onClick={() => fire('call')}
-            >
-              Call
-              <small>{formatChips(toCall)}</small>
-            </motion.button>
-          ) : (
-            <span className="felt-btn-spacer" aria-hidden="true" />
-          )}
-
-          <motion.button
-            type="button"
-            className="raise"
-            disabled={!canAggressive}
-            whileTap={canAggressive ? { scale: 0.96 } : undefined}
-            onClick={openAmountModal}
-          >
-            {aggressive.kind === 'bet' ? 'Bet' : 'Raise'}
-            <small>desde {formatChips(aggressive.amount)}</small>
-          </motion.button>
-
-          <motion.button
-            type="button"
-            className="triple"
-            disabled={!canTriple}
-            whileTap={canTriple ? { scale: 0.96 } : undefined}
-            onClick={() => fire(triple.kind, triple.amount)}
-          >
-            x3
-            <small>{formatChips(triple.amount)}</small>
-          </motion.button>
-
-          <motion.button
-            type="button"
-            className="custom"
-            disabled={!canAllIn}
-            whileTap={canAllIn ? { scale: 0.96 } : undefined}
-            onClick={() => fire('all-in')}
-          >
-            All-in
-          </motion.button>
-        </div>
         )}
       </div>
 
@@ -679,5 +642,55 @@ export function FeltView({
         onConfirm={confirmPending}
       />
     </section>
+  );
+}
+
+function FeltSeatPill({
+  player,
+  acting,
+  isButton,
+}: {
+  player: PublicPlayer;
+  acting: boolean;
+  isButton: boolean;
+}) {
+  const folded = player.status === 'FOLDED';
+  return (
+    <li
+      className={`felt-seat-pill${acting ? ' acting' : ''}${folded ? ' folded' : ''}`}
+    >
+      <SeatAvatar token={player.avatar} />
+      <div className="felt-seat-pill-info">
+        <span className="felt-seat-pill-name">
+          {acting ? '▸ ' : ''}
+          {player.displayName}
+          {isButton ? <span className="felt-dealer">D</span> : null}
+        </span>
+        <span className="felt-seat-pill-stack">{formatChips(player.stack)}</span>
+        {player.betThisRound ? (
+          <span className="felt-seat-pill-bet">{formatChips(player.betThisRound)}</span>
+        ) : folded ? (
+          <span className="felt-seat-pill-bet muted">Fold</span>
+        ) : player.status === 'ALL_IN' ? (
+          <span className="felt-seat-pill-bet">All-in</span>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+function SeatAvatar({ token }: { token?: string }) {
+  const known = token && SEAT_CHIPS.some((c) => c.token === token);
+  if (known && token) {
+    return (
+      <span className="felt-seat-pill-avatar">
+        <SeatChip chip={seatChipByToken(token)} size={28} selected />
+      </span>
+    );
+  }
+  return (
+    <span className="felt-seat-pill-avatar felt-seat-pill-avatar--fallback" aria-hidden>
+      {token && token.length <= 4 ? token : '♠'}
+    </span>
   );
 }

@@ -283,6 +283,7 @@ export function App() {
   const onCreate = screen === 'create';
   const onLobby = screen === 'lobby';
   const onJoin = screen === 'join' || screen === 'mesa-join';
+  const onPlay = screen === 'play';
   const feltShell = onHome || onCreate || onLobby || onJoin;
 
   return (
@@ -298,7 +299,9 @@ export function App() {
                 ? 'app app-lobby'
                 : onJoin
                   ? 'app app-join'
-                  : 'app'
+                  : onPlay
+                    ? 'app app-play'
+                    : 'app'
       }
     >
       {!feltShell ? (

@@ -1999,6 +1999,22 @@ button.small {
   overflow-x: hidden;
 }
 
+/* Play: tight chrome so the 3-zone felt can use almost the full phone height. */
+.app-play {
+  width: 100%;
+  max-width: min(40rem, 100%);
+  gap: 0.35rem;
+}
+
+#root:has(.app-play) {
+  padding: 0.35rem;
+  place-items: stretch center;
+}
+
+.app-play .topbar {
+  padding: 0.15rem 0;
+}
+
 /* ——— Join room / mesa ——— */
 .join {
   --join-gold: #c9b07a;
@@ -3015,20 +3031,456 @@ select {
   justify-content: center;
 }
 
-/* ---- Felt view: phone-first table layout ---- */
+/* ---- Felt view: 3-zone phone layout (20% / 40% / 40%) ---- */
 
 .felt {
   --felt-green: #14663f;
   --felt-dark: #0a3a24;
   position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  /* Leave room for the app topbar + root padding; fill the rest of the phone. */
+  height: calc(100dvh - 2.75rem);
+  height: calc(100vh - 2.75rem);
+  max-height: calc(100dvh - 2.75rem);
+  max-height: calc(100vh - 2.75rem);
+  overflow: hidden;
   background: radial-gradient(ellipse at 50% 30%, var(--felt-green), var(--felt-dark) 70%, #061c12);
   border-radius: 0.9rem;
-  padding: 0.7rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
+  padding: 0.4rem 0.45rem 0.5rem;
+  display: grid;
+  grid-template-rows: minmax(0, 2fr) minmax(0, 4fr) minmax(0, 4fr);
+  gap: 0.35rem;
   color: #e6f2ec;
   isolation: isolate;
+}
+
+.felt-z1,
+.felt-z2,
+.felt-z3 {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Z1 — community cards */
+.felt-z1 {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: stretch;
+}
+
+.felt-z1-top {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.felt-blinds-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #c8e6d4;
+}
+
+.felt-street-badge {
+  justify-self: center;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.75rem;
+  border-radius: 0.45rem 0.45rem 0 0;
+  color: #1a2e1c;
+  background: linear-gradient(180deg, #e8d5a0 0%, #c9b07a 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.felt-z1 .felt-community {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.felt-z1 .felt-community .community-row,
+.felt-z1 .felt-community .cards {
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
+.felt-last-action {
+  margin: 0;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.7rem;
+  color: #a7c4b4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Z2 — opponents + pot */
+.felt-z2 {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.felt-z2-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(4.5rem, 0.85fr) minmax(0, 1fr);
+  gap: 0.3rem;
+  align-items: stretch;
+}
+
+.felt-rail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 0.2rem;
+  min-height: 0;
+  min-width: 0;
+}
+
+.felt-seat-slot {
+  flex: 1 1 0;
+  min-height: 0.4rem;
+  max-height: 3.2rem;
+}
+
+.felt-seat-pill {
+  flex: 0 1 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.22rem 0.3rem;
+  border-radius: 0.55rem;
+  background: rgba(4, 28, 18, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.felt-seat-pill.acting {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 1px #4ade8088, 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.felt-seat-pill.folded {
+  opacity: 0.48;
+}
+
+.felt-seat-pill-avatar {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+}
+
+.felt-seat-pill-avatar svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.felt-seat-pill-avatar--fallback {
+  border-radius: 999px;
+  background: #1a3d2e;
+  border: 1px solid rgba(201, 176, 122, 0.35);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f5f0e6;
+}
+
+.felt-seat-pill-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.felt-seat-pill-name {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #eef7f1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.felt-seat-pill-stack {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #86efac;
+  font-variant-numeric: tabular-nums;
+}
+
+.felt-seat-pill-bet {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #fde68a;
+  font-variant-numeric: tabular-nums;
+}
+
+.felt-seat-pill-bet.muted {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.felt-z2-center {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.felt-z2-center .felt-pots,
+.felt-z2-center .felt-pot {
+  align-items: center;
+}
+
+.felt-result-mini {
+  margin: 0;
+  max-width: 100%;
+  text-align: center;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  color: #fde68a;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.felt-z2 .felt-showdown-list {
+  flex-shrink: 0;
+  max-height: 28%;
+  margin: 0;
+}
+
+/* Z3 — hero zone */
+.felt-z3 {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-height: 0;
+}
+
+.felt-z3-chrome {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.felt-hide-btn {
+  justify-self: start;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+  color: #d7e4d7;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.felt-hide-btn--ghost {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.felt-z3-chrome .felt-your-turn {
+  position: static;
+  margin: 0;
+  justify-self: center;
+  padding: 0.28rem 0.85rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+}
+
+.felt-turn-spacer {
+  justify-self: center;
+  width: 4rem;
+  height: 1px;
+}
+
+.felt-z3-chrome .felt-dealer-me {
+  justify-self: end;
+}
+
+.felt-dealer-spacer {
+  justify-self: end;
+  width: 1.6rem;
+}
+
+.felt-z3-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.felt-between {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.felt-between .next-hand {
+  margin: 0;
+  height: 100%;
+}
+
+.felt-z3 .felt-hole {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: center;
+  margin: 0;
+  padding: 0.2rem 0.15rem;
+}
+
+.felt-z3 .felt-hole .cards {
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.felt-hole-side {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.felt-z3 .felt-stack-target {
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.65rem;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+
+.felt-z3 .felt-my-hand {
+  margin: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.felt-z3 .felt-actionbar {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.felt-z3 .felt-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem 0.15rem;
+}
+
+.felt-z3 .felt-stats > div {
+  text-align: center;
+  min-width: 0;
+}
+
+.felt-z3 .felt-equity {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.felt-z3 .felt-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.felt-z3 .felt-buttons button {
+  min-width: 0;
+  padding: 0.45rem 0.15rem;
+  font-size: 0.72rem;
+  border-radius: 0.55rem;
+}
+
+.felt-z3 .felt-buttons small {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+@media (max-height: 680px) {
+  .felt {
+    gap: 0.25rem;
+    padding: 0.3rem;
+  }
+
+  .felt-street-badge {
+    font-size: 0.64rem;
+    padding: 0.2rem 0.55rem;
+  }
+
+  .felt-seat-pill {
+    padding: 0.15rem 0.25rem;
+  }
+
+  .felt-seat-pill-name {
+    font-size: 0.62rem;
+  }
+
+  .felt-z3 .felt-buttons button {
+    padding: 0.35rem 0.1rem;
+    font-size: 0.66rem;
+  }
+}
+
+@media (min-width: 720px) {
+  .felt {
+    height: min(52rem, calc(100dvh - 3rem));
+    max-height: calc(100dvh - 3rem);
+  }
+
+  .felt-z2-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(7rem, 0.7fr) minmax(0, 1fr);
+  }
 }
 
 /* Full-screen-ish moving green border while it is your turn. */
