@@ -1,5 +1,8 @@
 import type { RoomSummary } from '@poker/shared';
 
+/** Max active tables shown on the home screen (matches server directory cap). */
+export const MAX_ACTIVE_ROOMS = 5;
+
 function fold(value: string): string {
   return value
     .toLowerCase()
@@ -14,6 +17,10 @@ export function matchesQuery(room: RoomSummary, query: string): boolean {
   return fold(`${room.name} ${room.code}`).includes(q);
 }
 
+/**
+ * Filter by search query, then cap at {@link MAX_ACTIVE_ROOMS}.
+ * Order is preserved (server already sorts by occupancy).
+ */
 export function filterRooms(rooms: RoomSummary[], query: string): RoomSummary[] {
-  return rooms.filter((room) => matchesQuery(room, query));
+  return rooms.filter((room) => matchesQuery(room, query)).slice(0, MAX_ACTIVE_ROOMS);
 }

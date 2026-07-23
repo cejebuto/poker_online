@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { RoomSummary } from '@poker/shared';
-import { filterRooms, matchesQuery } from '../src/features/roomFilter.js';
+import { filterRooms, matchesQuery, MAX_ACTIVE_ROOMS } from '../src/features/roomFilter.js';
 
-function room(name: string, code: string): RoomSummary {
+function room(name: string, code: string, overrides: Partial<RoomSummary> = {}): RoomSummary {
   return {
     roomId: `room_${code}`,
     code,
@@ -12,6 +12,9 @@ function room(name: string, code: string): RoomSummary {
     maxPlayers: 6,
     phase: 'LOBBY',
     hasPassword: true,
+    smallBlind: 25,
+    bigBlind: 50,
+    ...overrides,
   };
 }
 
@@ -52,5 +55,13 @@ describe('room search filter', () => {
       filterRooms(rooms, 'alfa').map((r) => r.name),
       ['Alfa', 'Alfajor'],
     );
+  });
+
+  it(`caps visible rooms at ${MAX_ACTIVE_ROOMS}`, () => {
+    const rooms = Array.from({ length: 8 }, (_, i) =>
+      room(`Mesa ${i}`, `CODE${i}`.slice(0, 6).padEnd(6, 'X')),
+    );
+    assert.equal(filterRooms(rooms, '').length, MAX_ACTIVE_ROOMS);
+    assert.equal(MAX_ACTIVE_ROOMS, 5);
   });
 });

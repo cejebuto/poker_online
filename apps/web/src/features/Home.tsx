@@ -1,7 +1,15 @@
 import type { RoomSummary } from '@poker/shared';
+import type { ConnectionStatus } from '../net/wsClient';
 import { RoomBrowser } from './RoomBrowser';
 
+const CONN_LABEL: Record<ConnectionStatus, string> = {
+  connecting: 'Conectando',
+  connected: 'Conectado',
+  disconnected: 'Desconectado',
+};
+
 export function Home({
+  status,
   onCreate,
   onJoin,
   onMesa,
@@ -9,7 +17,9 @@ export function Home({
   rooms,
   onPickRoom,
   onRefreshRooms,
+  onOpenThemes,
 }: {
+  status: ConnectionStatus;
   onCreate: () => void;
   onJoin: () => void;
   onMesa: () => void;
@@ -17,27 +27,47 @@ export function Home({
   rooms: RoomSummary[] | null;
   onPickRoom: (room: RoomSummary, as: 'player' | 'mesa') => void;
   onRefreshRooms: () => void;
+  onOpenThemes?: () => void;
 }) {
   return (
-    <>
-      <section className="panel">
-        <h2>Poker con Amigos</h2>
-        <p className="muted">Salas privadas · Texas Hold&apos;em No-Limit</p>
-        {joinPrefill ? <p className="meta">Invitación a sala: {joinPrefill}</p> : null}
-        <div className="stack">
-          <button type="button" className="primary" onClick={onCreate}>
-            Crear sala (Host)
-          </button>
-          <button type="button" onClick={onJoin}>
+    <div className="home">
+      <header className="home-top">
+        <div className={`home-conn home-conn--${status}`} role="status">
+          <span className={`dot ${status}`} aria-hidden />
+          {CONN_LABEL[status]}
+        </div>
+        <p className="home-brand">TEXAS HOLD&apos;EM · NO-LIMIT</p>
+      </header>
+
+      <section className="home-card home-hero" aria-labelledby="home-title">
+        <h1 id="home-title" className="home-title">
+          Póker con amigos
+        </h1>
+        <p className="home-sub">Salas privadas · una mano entre conocidos</p>
+        {joinPrefill ? (
+          <p className="home-invite">Invitación a sala: {joinPrefill}</p>
+        ) : null}
+
+        <button type="button" className="home-cta" onClick={onCreate}>
+          Crear sala nueva
+        </button>
+        <div className="home-secondary">
+          <button type="button" className="home-btn" onClick={onJoin}>
             Unirse con código
           </button>
-          <button type="button" className="ghost" onClick={onMesa}>
-            Entrar como Mesa
+          <button type="button" className="home-btn home-btn--outline" onClick={onMesa}>
+            Entrar para ver
           </button>
         </div>
       </section>
 
       <RoomBrowser rooms={rooms} onPick={onPickRoom} onRefresh={onRefreshRooms} />
-    </>
+
+      {onOpenThemes ? (
+        <button type="button" className="home-themes" onClick={onOpenThemes}>
+          Ajustes de cartas / temas
+        </button>
+      ) : null}
+    </div>
   );
 }

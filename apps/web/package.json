@@ -15,12 +15,14 @@
     "@poker/shared": "workspace:*",
     "@use-gesture/react": "^10.3.1",
     "motion": "^12.42.2",
+    "qrcode": "^1.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "use-sound": "^5.0.0"
   },
   "devDependencies": {
     "@types/howler": "^2.2.13",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.4.1",

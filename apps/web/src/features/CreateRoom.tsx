@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { RoomConfig } from '@poker/shared';
 
 export type CreateRoomSubmit = {
@@ -7,6 +7,13 @@ export type CreateRoomSubmit = {
 };
 
 const PASSWORD_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+const BLIND_PRESETS = [
+  { sb: 5, bb: 10 },
+  { sb: 10, bb: 25 },
+  { sb: 25, bb: 50 },
+  { sb: 50, bb: 100 },
+] as const;
 
 /** 6 random uppercase letters (matches room password format). */
 function generateRoomPassword(): string {
@@ -19,17 +26,25 @@ function generateRoomPassword(): string {
   return out;
 }
 
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
+}
+
 export function CreateRoom({
   onSubmit,
+  onBack,
   busy,
   error,
 }: {
   onSubmit: (data: CreateRoomSubmit) => void;
+  onBack?: () => void;
   busy?: boolean;
   error?: string;
 }) {
+  const nameId = useId();
+  const pwdId = useId();
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('Poker Night');
+  const [name, setName] = useState('Noche de póker');
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [mode, setMode] = useState<'cash' | 'tournament'>('cash');
   const [startingStack, setStartingStack] = useState(1000);
@@ -43,176 +58,304 @@ export function CreateRoom({
 
   // Empty = open room; otherwise exactly 6 letters.
   const valid = password === '' || /^[A-Za-z]{6}$/.test(password);
+  const canCreate = valid && name.trim().length > 0 && !busy;
+
+  const applyBlindPreset = (sb: number, bb: number) => {
+    setSmallBlind(sb);
+    setBigBlind(bb);
+  };
+
+  const submit = () => {
+    if (!canCreate) return;
+    onSubmit({
+      password,
+      config: {
+        name: name.trim(),
+        maxPlayers,
+        mode,
+        startingStack,
+        smallBlind,
+        bigBlind,
+        allowRebuy: mode === 'cash' && allowRebuy,
+        rebuyMax,
+        turnTimeoutMs: turnSec * 1000,
+        timeBankMs: timeBankSec * 1000,
+        doubleMinimum,
+      },
+    });
+  };
 
   return (
-    <section className="panel">
-      <h2>Crear sala</h2>
-      <label className="field">
-        Nombre
-        <input value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
-      <label className="field">
-        Contraseña (opcional, 6 letras)
-        <div className="field-row">
-          <input
-            value={password}
-            maxLength={6}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Vacía = sin contraseña"
-            autoCapitalize="off"
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => setPassword(generateRoomPassword())}
-          >
-            Generar
-          </button>
+    <div className="create">
+      <header className="create-top">
+        <div className="create-top-main">
+          {onBack ? (
+            <button type="button" className="create-back" onClick={onBack}>
+              ← Inicio
+            </button>
+          ) : null}
+          <p className="create-eyebrow">NUEVA PARTIDA</p>
+          <h1 className="create-title">Crear sala</h1>
         </div>
-      </label>
-      {!valid && password.length > 0 ? (
-        <p className="error">Vacía o exactamente 6 letras A–Z (sin números ni símbolos)</p>
-      ) : null}
+        <div className="create-summary" aria-label="Resumen de la mesa">
+          <span className="create-summary-icon" aria-hidden>
+            ♠
+          </span>
+          <div className="create-summary-text">
+            <span className="create-summary-label">RESUMEN</span>
+            <span className="create-summary-value">
+              {maxPlayers}p · {smallBlind}/{bigBlind}
+            </span>
+          </div>
+        </div>
+      </header>
 
-      <label className="field">
-        Modalidad
-        <select
-          value={mode}
-          onChange={(e) => {
-            const m = e.target.value as 'cash' | 'tournament';
-            setMode(m);
-            if (m === 'tournament') setAllowRebuy(false);
-            else setAllowRebuy(true);
-          }}
-        >
-          <option value="cash">Cash game (blinds fijas + rebuy)</option>
-          <option value="tournament">Torneo (blinds progresivas)</option>
-        </select>
-      </label>
-
-      <div className="config-grid">
-        <label className="field">
-          Máx. jugadores (2–9)
+      <div className="create-scroll">
+        <label className="create-field" htmlFor={nameId}>
+          <span className="create-label">NOMBRE DE LA SALA</span>
           <input
-            type="number"
-            min={2}
-            max={9}
+            id={nameId}
+            className="create-input"
+            value={name}
+            maxLength={40}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Noche de póker"
+          />
+        </label>
+
+        <div className="create-field">
+          <label className="create-label" htmlFor={pwdId}>
+            CONTRASEÑA <span className="create-label-soft">· opcional</span>
+          </label>
+          <div className="create-pwd-row">
+            <input
+              id={pwdId}
+              className="create-input"
+              value={password}
+              maxLength={6}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Vacía = pública"
+              autoCapitalize="off"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className="create-gen"
+              onClick={() => setPassword(generateRoomPassword())}
+            >
+              Generar
+            </button>
+          </div>
+          {!valid && password.length > 0 ? (
+            <p className="create-error">Vacía o exactamente 6 letras A–Z</p>
+          ) : null}
+        </div>
+
+        <div className="create-field" role="group" aria-label="Modalidad">
+          <span className="create-label">MODALIDAD</span>
+          <div className="create-seg">
+            <button
+              type="button"
+              className={mode === 'cash' ? 'create-seg-btn active' : 'create-seg-btn'}
+              aria-pressed={mode === 'cash'}
+              onClick={() => {
+                setMode('cash');
+                setAllowRebuy(true);
+              }}
+            >
+              Cash game
+            </button>
+            <button
+              type="button"
+              className={mode === 'tournament' ? 'create-seg-btn active' : 'create-seg-btn'}
+              aria-pressed={mode === 'tournament'}
+              onClick={() => {
+                setMode('tournament');
+                setAllowRebuy(false);
+              }}
+            >
+              Torneo
+            </button>
+          </div>
+        </div>
+
+        <div className="create-grid">
+          <Stepper
+            label="JUGADORES"
             value={maxPlayers}
-            onChange={(e) => setMaxPlayers(Number(e.target.value))}
+            display={String(maxPlayers)}
+            onDec={() => setMaxPlayers((n) => clamp(n - 1, 2, 9))}
+            onInc={() => setMaxPlayers((n) => clamp(n + 1, 2, 9))}
           />
-        </label>
-        <label className="field">
-          Stack inicial
-          <input
-            type="number"
-            min={100}
+          <Stepper
+            label="STACK INICIAL"
             value={startingStack}
-            onChange={(e) => setStartingStack(Number(e.target.value))}
+            display={String(startingStack)}
+            onDec={() => setStartingStack((n) => clamp(n - 100, 100, 100_000))}
+            onInc={() => setStartingStack((n) => clamp(n + 100, 100, 100_000))}
           />
-        </label>
-        <label className="field">
-          Small blind
-          <input
-            type="number"
-            min={1}
+          <Stepper
+            label="SMALL BLIND"
             value={smallBlind}
-            onChange={(e) => setSmallBlind(Number(e.target.value))}
+            display={String(smallBlind)}
+            onDec={() => setSmallBlind((n) => clamp(n - 1, 1, bigBlind))}
+            onInc={() => {
+              const next = clamp(smallBlind + 1, 1, 10_000);
+              setSmallBlind(next);
+              if (next > bigBlind) setBigBlind(next);
+            }}
           />
-        </label>
-        <label className="field">
-          Big blind
-          <input
-            type="number"
-            min={1}
+          <Stepper
+            label="BIG BLIND"
             value={bigBlind}
-            onChange={(e) => setBigBlind(Number(e.target.value))}
+            display={String(bigBlind)}
+            onDec={() => setBigBlind((n) => clamp(n - 1, smallBlind, 20_000))}
+            onInc={() => setBigBlind((n) => clamp(n + 1, smallBlind, 20_000))}
           />
-        </label>
-        <label className="field">
-          Timer turno (s, 0=∞)
-          <input
-            type="number"
-            min={0}
+          <Stepper
+            label="TURNO"
             value={turnSec}
-            onChange={(e) => setTurnSec(Number(e.target.value))}
+            display={turnSec === 0 ? '∞' : `${turnSec}s`}
+            onDec={() => setTurnSec((n) => clamp(n - 5, 0, 300))}
+            onInc={() => setTurnSec((n) => clamp(n + 5, 0, 300))}
           />
-        </label>
-        <label className="field">
-          Time bank (s)
-          <input
-            type="number"
-            min={0}
+          <Stepper
+            label="TIME BANK"
             value={timeBankSec}
-            onChange={(e) => setTimeBankSec(Number(e.target.value))}
+            display={`${timeBankSec}s`}
+            onDec={() => setTimeBankSec((n) => clamp(n - 10, 0, 600))}
+            onInc={() => setTimeBankSec((n) => clamp(n + 10, 0, 600))}
           />
-        </label>
+        </div>
+
+        <div className="create-field" role="group" aria-label="Atajos de ciegas">
+          <span className="create-label">ATAJOS DE CIEGAS</span>
+          <div className="create-presets">
+            {BLIND_PRESETS.map(({ sb, bb }) => {
+              const active = smallBlind === sb && bigBlind === bb;
+              return (
+                <button
+                  key={`${sb}-${bb}`}
+                  type="button"
+                  className={active ? 'create-preset active' : 'create-preset'}
+                  aria-pressed={active}
+                  onClick={() => applyBlindPreset(sb, bb)}
+                >
+                  {sb}/{bb}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {mode === 'cash' ? (
+          <div className="create-toggle-row">
+            <span className="create-toggle-label">Permitir recompra</span>
+            <div className="create-toggle-controls">
+              <div className="create-mini-step">
+                <button
+                  type="button"
+                  className="create-step-btn"
+                  disabled={!allowRebuy}
+                  aria-label="Menos recompras"
+                  onClick={() => setRebuyMax((n) => clamp(n - 1, 0, 20))}
+                >
+                  −
+                </button>
+                <span className="create-mini-val">{rebuyMax}</span>
+                <button
+                  type="button"
+                  className="create-step-btn"
+                  disabled={!allowRebuy}
+                  aria-label="Más recompras"
+                  onClick={() => setRebuyMax((n) => clamp(n + 1, 0, 20))}
+                >
+                  +
+                </button>
+              </div>
+              <Toggle
+                checked={allowRebuy}
+                onChange={setAllowRebuy}
+                label="Permitir recompra"
+              />
+            </div>
+          </div>
+        ) : (
+          <p className="create-hint">
+            Torneo: ciegas suben ~cada 5 min. Sin recompra. Eliminación a stack 0.
+          </p>
+        )}
+
+        <div className="create-toggle-row">
+          <span className="create-toggle-label">Apuesta mínima 2× BB</span>
+          <Toggle
+            checked={doubleMinimum}
+            onChange={setDoubleMinimum}
+            label="Apuesta mínima 2× BB"
+          />
+        </div>
+
+        {error ? <p className="create-error banner">{error}</p> : null}
       </div>
 
-      {mode === 'cash' ? (
-        <div className="config-grid">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={allowRebuy}
-              onChange={(e) => setAllowRebuy(e.target.checked)}
-            />
-            Permitir recompra
-          </label>
-          <label className="field">
-            Máx. recompras
-            <input
-              type="number"
-              min={0}
-              max={20}
-              value={rebuyMax}
-              disabled={!allowRebuy}
-              onChange={(e) => setRebuyMax(Number(e.target.value))}
-            />
-          </label>
-        </div>
-      ) : (
-        <p className="muted">
-          Torneo: blinds suben cada ~5 min (estructura por defecto). Sin recompra. Eliminación a
-          stack 0.
-        </p>
-      )}
+      <footer className="create-footer">
+        <button type="button" className="create-cta" disabled={!canCreate} onClick={submit}>
+          {busy ? 'Creando…' : 'Crear sala'}
+        </button>
+      </footer>
+    </div>
+  );
+}
 
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={doubleMinimum}
-          onChange={(e) => setDoubleMinimum(e.target.checked)}
-        />
-        Doblar el mínimo (apuesta mínima = 2× BB)
-      </label>
+function Stepper({
+  label,
+  value,
+  display,
+  onDec,
+  onInc,
+}: {
+  label: string;
+  value: number;
+  display: string;
+  onDec: () => void;
+  onInc: () => void;
+}) {
+  return (
+    <div className="create-stepper" data-value={value}>
+      <span className="create-label">{label}</span>
+      <div className="create-step-body">
+        <button type="button" className="create-step-btn" aria-label={`${label} menos`} onClick={onDec}>
+          −
+        </button>
+        <span className="create-step-val">{display}</span>
+        <button type="button" className="create-step-btn" aria-label={`${label} más`} onClick={onInc}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
 
-      {error ? <p className="error">{error}</p> : null}
-      <button
-        type="button"
-        className="primary"
-        disabled={!valid || busy}
-        onClick={() =>
-          onSubmit({
-            password,
-            config: {
-              name,
-              maxPlayers,
-              mode,
-              startingStack,
-              smallBlind,
-              bigBlind,
-              allowRebuy: mode === 'cash' && allowRebuy,
-              rebuyMax,
-              turnTimeoutMs: turnSec * 1000,
-              timeBankMs: timeBankSec * 1000,
-              doubleMinimum,
-            },
-          })
-        }
-      >
-        Crear
-      </button>
-    </section>
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className={checked ? 'create-switch on' : 'create-switch'}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="create-switch-knob" />
+    </button>
   );
 }

@@ -13,6 +13,9 @@ export type RoomSummary = {
   maxPlayers: number;
   phase: RoomPhase;
   hasPassword: boolean;
+  /** Effective blinds for display (cash config or current tournament level). */
+  smallBlind: number;
+  bigBlind: number;
 };
 
 /** One tournament blind level. */

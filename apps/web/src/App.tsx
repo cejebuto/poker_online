@@ -213,9 +213,9 @@ export function App() {
 
   if (!user && screen === 'user') {
     return (
-      <main className="app">
-        <Conn status={status} />
+      <main className="app app-gate">
         <UserGate
+          status={status}
           onReady={(u) => {
             setUser(u);
             setScreen(prefill ? 'join' : 'home');
@@ -279,35 +279,53 @@ export function App() {
 
   // The shared screen needs the whole width; every other screen stays phone-sized.
   const onMesa = screen === 'table' || role === 'mesa';
+  const onHome = screen === 'home';
+  const onCreate = screen === 'create';
+  const onLobby = screen === 'lobby';
+  const onJoin = screen === 'join' || screen === 'mesa-join';
+  const feltShell = onHome || onCreate || onLobby || onJoin;
 
   return (
-    <main className={onMesa ? 'app app-wide' : 'app'}>
-      <div className="topbar">
-        <Conn status={status} />
-        {back ? (
-          <button type="button" className="ghost small" onClick={goBack}>
-            {back.label}
-          </button>
-        ) : null}
-      </div>
+    <main
+      className={
+        onMesa
+          ? 'app app-wide'
+          : onHome
+            ? 'app app-home'
+            : onCreate
+              ? 'app app-create'
+              : onLobby
+                ? 'app app-lobby'
+                : onJoin
+                  ? 'app app-join'
+                  : 'app'
+      }
+    >
+      {!feltShell ? (
+        <div className="topbar">
+          <Conn status={status} />
+          {back ? (
+            <button type="button" className="ghost small" onClick={goBack}>
+              {back.label}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {screen === 'home' && (
-        <>
-          <Home
-            joinPrefill={prefill}
-            onCreate={() => setScreen('create')}
-            onJoin={() => setScreen('join')}
-            onMesa={() => setScreen('mesa-join')}
-            rooms={rooms}
-            onRefreshRooms={() => send({ type: 'rooms:list' })}
-            onPickRoom={(room, as) => {
-              setPickedRoom(room.code);
-              setScreen(as === 'mesa' ? 'mesa-join' : 'join');
-            }}
-          />
-          <button type="button" className="ghost" onClick={() => openThemes('home')}>
-            Ajustes de cartas / temas
-          </button>
-        </>
+        <Home
+          status={status}
+          joinPrefill={prefill}
+          onCreate={() => setScreen('create')}
+          onJoin={() => setScreen('join')}
+          onMesa={() => setScreen('mesa-join')}
+          rooms={rooms}
+          onRefreshRooms={() => send({ type: 'rooms:list' })}
+          onPickRoom={(room, as) => {
+            setPickedRoom(room.code);
+            setScreen(as === 'mesa' ? 'mesa-join' : 'join');
+          }}
+          onOpenThemes={() => openThemes('home')}
+        />
       )}
       {screen === 'themes' && (
         <ThemeSettings onClose={() => setScreen(themesReturn)} />
@@ -316,6 +334,7 @@ export function App() {
         <CreateRoom
           busy={busy}
           error={error}
+          onBack={goBack}
           onSubmit={({ password, config }) => {
             setBusy(true);
             send({
@@ -333,6 +352,7 @@ export function App() {
           prefillRoomId={pickedRoom ?? prefill}
           busy={busy}
           error={error}
+          onBack={goBack}
           onSubmit={({ roomIdOrCode, password }) => {
             setBusy(true);
             const isId = roomIdOrCode.startsWith('room_');
@@ -433,7 +453,7 @@ export function App() {
         <TableView state={roomState} onOpenThemes={() => openThemes('table')} />
       )}
       {notice ? <p className="notice banner">{notice}</p> : null}
-      {error && screen !== 'create' && screen !== 'join' ? (
+      {error && screen !== 'create' && screen !== 'join' && screen !== 'mesa-join' ? (
         <p className="error banner">{error}</p>
       ) : null}
     </main>

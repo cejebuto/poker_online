@@ -1,48 +1,115 @@
-import { useState } from 'react';
+import { useId, useState, type FormEvent, type KeyboardEvent } from 'react';
+import type { ConnectionStatus } from '../net/wsClient';
+import { SEAT_CHIPS, SeatChip, seatChipByToken } from './SeatChip';
 
-const AVATARS = ['🃏', '🎩', '🦊', '🐉', '🍀', '⭐'];
+const CONN_LABEL: Record<ConnectionStatus, string> = {
+  connecting: 'Conectando',
+  connected: 'Conectado',
+  disconnected: 'Desconectado',
+};
 
 export function UserGate({
+  status,
   onReady,
 }: {
+  status: ConnectionStatus;
   onReady: (user: { displayName: string; avatar: string }) => void;
 }) {
+  const nameId = useId();
+  const chipsId = useId();
   const [name, setName] = useState('');
-  const [avatar, setAvatar] = useState(AVATARS[0]!);
+  const [avatar, setAvatar] = useState(SEAT_CHIPS[0]!.token);
+
+  const trimmed = name.trim();
+  const canSubmit = trimmed.length >= 2;
+  const previewName = trimmed || 'Invitado';
+  const chip = seatChipByToken(avatar);
+
+  const submit = () => {
+    if (!canSubmit) return;
+    onReady({ displayName: trimmed, avatar });
+  };
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    submit();
+  };
+
+  const onNameKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  };
 
   return (
-    <section className="panel">
-      <h2>¿Quién sos?</h2>
-      <p className="muted">Nombre y avatar (sin cuenta)</p>
-      <label className="field">
-        Nombre
-        <input
-          value={name}
-          maxLength={20}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Tu apodo"
-        />
-      </label>
-      <div className="avatar-row">
-        {AVATARS.map((a) => (
-          <button
-            key={a}
-            type="button"
-            className={a === avatar ? 'avatar selected' : 'avatar'}
-            onClick={() => setAvatar(a)}
-          >
-            {a}
-          </button>
-        ))}
-      </div>
-      <button
-        type="button"
-        className="primary"
-        disabled={name.trim().length < 2}
-        onClick={() => onReady({ displayName: name.trim(), avatar })}
-      >
-        Continuar
-      </button>
+    <section className="gate" aria-labelledby="gate-title">
+      <header className="gate-top">
+        <div className={`gate-conn gate-conn--${status}`} role="status">
+          <span className={`dot ${status}`} aria-hidden />
+          {CONN_LABEL[status]}
+        </div>
+        <p className="gate-brand">MESA · TEXAS HOLD&apos;EM</p>
+      </header>
+
+      <form className="gate-card" onSubmit={onSubmit}>
+        <p className="gate-eyebrow">SIN CUENTA · JUEGO RÁPIDO</p>
+        <h1 id="gate-title" className="gate-title">
+          ¿Quién sos?
+        </h1>
+        <p className="gate-sub">Elegí un nombre y una ficha para tomar asiento en la mesa.</p>
+
+        <label className="gate-field" htmlFor={nameId}>
+          <span className="gate-label">NOMBRE</span>
+          <input
+            id={nameId}
+            className="gate-input"
+            value={name}
+            maxLength={20}
+            autoComplete="nickname"
+            autoFocus
+            enterKeyHint="done"
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={onNameKeyDown}
+            placeholder="Tu apodo en la mesa"
+          />
+        </label>
+
+        <div className="gate-field" role="group" aria-labelledby={chipsId}>
+          <span id={chipsId} className="gate-label">
+            TU FICHA
+          </span>
+          <div className="gate-chips">
+            {SEAT_CHIPS.map((c) => {
+              const selected = c.token === avatar;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={selected ? 'gate-chip selected' : 'gate-chip'}
+                  aria-pressed={selected}
+                  aria-label={c.label}
+                  onClick={() => setAvatar(c.token)}
+                >
+                  <SeatChip chip={c} selected={selected} size={52} />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="gate-seat" aria-live="polite">
+          <SeatChip chip={chip} selected size={36} />
+          <div className="gate-seat-text">
+            <span className="gate-label">TU ASIENTO</span>
+            <span className="gate-seat-name">{previewName}</span>
+          </div>
+        </div>
+
+        <button type="submit" className="gate-cta" disabled={!canSubmit}>
+          Tomar asiento
+        </button>
+      </form>
     </section>
   );
 }
