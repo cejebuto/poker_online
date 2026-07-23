@@ -14,7 +14,7 @@
     "test:load": "pnpm --filter @poker/api exec tsx scripts/load-test-domain.ts",
     "test:playwright": "playwright test",
     "typecheck": "pnpm -r --filter @poker/shared --filter @poker/engine --filter @poker/api --filter @poker/web typecheck",
-    "deploy:prod": "docker compose -f docker-compose.prod.yml --env-file .env.production up --build -d",
+    "deploy:prod": "bash ./start_prod.sh",
     "backup:pg": "bash scripts/backup-postgres.sh"
   },
   "devDependencies": {

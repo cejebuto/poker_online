@@ -84,7 +84,15 @@ pnpm deploy:prod       # requiere .env.production
 pnpm backup:pg         # dump Postgres
 ```
 
-- Deploy: [`docs/deploy.md`](./docs/deploy.md)
+Producción con dominio (ej. `juegapoker.online` + Cloudflare):
+
+```bash
+./start_prod.sh
+# Puertos 80/443 · invite links usan el dominio · WSS same-origin /ws
+# Acceso por IP directa → 403 (solo el dominio)
+```
+
+- Deploy + Cloudflare: [`docs/deploy.md`](./docs/deploy.md)
 - Seguridad: [`docs/security-medium-checklist.md`](./docs/security-medium-checklist.md)
 - Spec §19: [`docs/spec-open-questions.md`](./docs/spec-open-questions.md)
 - Temas de cartas: [`apps/web/src/cards/README.md`](./apps/web/src/cards/README.md)

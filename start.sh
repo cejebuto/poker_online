@@ -12,6 +12,14 @@
 #   git clone <repo> && cd <repo> && ./start.sh prod
 #   Point a DNS A record at the droplet IP and enter the domain when asked —
 #   Caddy obtains the TLS certificate automatically.
+#
+# Cloudflare (proxied orange cloud):
+#   ./start_prod.sh
+#   # or: DOMAIN=juegapoker.online ./start.sh prod
+#   Dashboard SSL/TLS mode: Full or Full (strict). WebSockets: On.
+#   WEB_ORIGIN becomes https://<domain> so invite links / QR use that host.
+#   Direct IP access is blocked (403) at Caddy; use the domain only.
+#   See docs/deploy.md
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -174,9 +182,10 @@ ensure_env_prod() {
   if [[ -z "$DOMAIN" ]]; then
     echo
     echo "Public address for this deployment:"
-    echo "  - a domain (e.g. poker.example.com)  -> automatic HTTPS via Let's Encrypt"
+    echo "  - a domain (e.g. juegapoker.online)  -> HTTPS via Caddy/Let's Encrypt"
     echo "  - a public IP (e.g. 164.90.10.20)    -> plain HTTP (no cert for bare IPs)"
     echo "  - empty                              -> localhost (self-signed HTTPS)"
+    echo "  Behind Cloudflare: use the domain; set SSL mode to Full (or Full strict)."
     read -r -p "Domain or IP (empty = localhost): " DOMAIN
   fi
 
@@ -188,6 +197,10 @@ ensure_env_prod() {
     site="http://${DOMAIN}"
     origin="http://${DOMAIN}"
   else
+    # Strip accidental scheme/trailing slash from DOMAIN=
+    DOMAIN="${DOMAIN#https://}"
+    DOMAIN="${DOMAIN#http://}"
+    DOMAIN="${DOMAIN%/}"
     site="$DOMAIN"
     origin="https://${DOMAIN}"
   fi
@@ -257,6 +270,7 @@ else
   esac
   echo
   echo "  Logs:    docker compose -f docker-compose.prod.yml --env-file .env.production logs -f"
-  echo "  Stop:    ./start.sh down"
+  echo "  Stop:    ./start_prod.sh down   (or ./start.sh down)"
   echo "  Backup:  ./scripts/backup-postgres.sh"
+  echo "  Note:    direct IP access returns 403 — use the domain only"
 fi

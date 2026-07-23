@@ -1,28 +1,61 @@
-# TLS reverse proxy for HTTPS + WSS.
-# Local: SITE_ADDRESS=localhost → Caddy may use internal certs.
-# Public: set SITE_ADDRESS=poker.example.com and open 80/443.
+# Reverse proxy for HTTPS + WSS.
+#
+# SITE_ADDRESS (env):
+#   juegapoker.online          → automatic HTTPS (Let's Encrypt) — use with
+#                                Cloudflare SSL mode Full or Full (strict)
+#   http://juegapoker.online   → plain HTTP on :80 only — use with Cloudflare
+#                                SSL mode Flexible (CF terminates TLS)
+#   localhost                  → self-signed / local testing
+#
+# Cloudflare checklist:
+#   - DNS A/AAAA (orange cloud) → this server's public IP
+#   - SSL/TLS → Full (recommended) or Full (strict) with the default SITE_ADDRESS
+#   - Network → WebSockets enabled (default on)
+#   - Do not force a page rule that breaks /.well-known/acme-challenge
+#
+# Direct IP access is rejected (catch-all blocks below). Cloudflare still works
+# because it sends Host: <domain>, which matches the site block.
 
 {$SITE_ADDRESS:localhost} {
-  encode gzip
+	encode gzip
 
-  # API HTTP
-  handle /health {
-    reverse_proxy api:3001
-  }
-  handle /metrics {
-    reverse_proxy api:3001
-  }
-  handle /rooms/* {
-    reverse_proxy api:3001
-  }
+	# API HTTP
+	handle /health {
+		reverse_proxy api:3001
+	}
+	handle /metrics {
+		reverse_proxy api:3001
+	}
+	handle /rooms/* {
+		reverse_proxy api:3001
+	}
 
-  # WebSocket
-  handle /ws {
-    reverse_proxy api:3001
-  }
+	# WebSocket (Caddy upgrades automatically; long timeouts for idle tables)
+	handle /ws {
+		reverse_proxy api:3001 {
+			transport http {
+				read_timeout 3600s
+				write_timeout 3600s
+			}
+		}
+	}
 
-  # SPA + static
-  handle {
-    reverse_proxy web:80
-  }
+	# SPA + static (nginx inside web container)
+	handle {
+		reverse_proxy web:80
+	}
+}
+
+# Reject raw IP / unknown Host on HTTP.
+# Named site above still owns ACME + redirects for SITE_ADDRESS.
+:80 {
+	header Content-Type "text/plain; charset=utf-8"
+	respond "403 Forbidden — use the domain name, not the server IP." 403
+}
+
+# Reject raw IP / unknown Host on HTTPS (self-signed cert only for this catch-all).
+:443 {
+	tls internal
+	header Content-Type "text/plain; charset=utf-8"
+	respond "403 Forbidden — use the domain name, not the server IP." 403
 }
