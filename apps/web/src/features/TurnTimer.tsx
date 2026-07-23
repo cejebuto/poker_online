@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { turnClock } from './turnClock';
 
 export function TurnTimer({
   turnStartedAt,
@@ -26,25 +27,27 @@ export function TurnTimer({
   // as if the room had no timer configured.
   if (!active) return null;
 
-  if (!turnStartedAt || !turnTimeoutMs || turnTimeoutMs <= 0) {
+  const clock = turnClock({
+    now,
+    startedAt: turnStartedAt,
+    timeoutMs: turnTimeoutMs,
+    bankMs: timeBankMs,
+  });
+  if (!clock) {
     return <p className="meta">Timer: sin límite</p>;
   }
 
-  const elapsed = now - turnStartedAt;
   const bank = timeBankMs ?? 0;
-  const total = turnTimeoutMs + bank;
-  const remaining = Math.max(0, total - elapsed);
-  const inBank = elapsed > turnTimeoutMs;
-  const pct = Math.max(0, Math.min(100, (remaining / total) * 100));
+  const pct = Math.max(0, Math.min(100, (1 - clock.spent) * 100));
 
   return (
-    <div className={`turn-timer ${isMyTurn ? 'mine' : ''} ${inBank ? 'bank' : ''}`}>
+    <div className={`turn-timer ${isMyTurn ? 'mine' : ''} ${clock.inBank ? 'bank' : ''}`}>
       <div className="turn-timer-bar">
         <div className="turn-timer-fill" style={{ width: `${pct}%` }} />
       </div>
       <span className="meta">
-        {isMyTurn ? 'Tu reloj' : 'Reloj'} · {(remaining / 1000).toFixed(1)}s
-        {inBank ? ' (time bank)' : ''} · bank {(bank / 1000).toFixed(0)}s
+        {isMyTurn ? 'Tu reloj' : 'Reloj'} · {(clock.remainingMs / 1000).toFixed(1)}s
+        {clock.inBank ? ' (time bank)' : ''} · bank {(bank / 1000).toFixed(0)}s
       </span>
     </div>
   );

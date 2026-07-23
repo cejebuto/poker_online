@@ -15,6 +15,13 @@ import { CARD_PX } from './CardTheme';
  */
 export const HALF_VISIBLE_RATIO = 0.56;
 
+/**
+ * Where the big centre pip sits inside the *visible band* of a half card,
+ * as a share of that band. Centring it on the card instead put the pip at 61%
+ * of the height, past the 56% cut — it came out sliced in half.
+ */
+export const HALF_PIP_BAND_RATIO = 0.55;
+
 export type CardBox = {
   w: number;
   h: number;
@@ -35,4 +42,14 @@ export function cardBox(
     h: Math.max(1, Math.round(h * scale * HALF_VISIBLE_RATIO)),
     innerScale: scale,
   };
+}
+
+/**
+ * Vertical centre for a card's big suit symbol, in artwork coordinates.
+ * Themes that draw their own face use it so the pip stays readable when the
+ * bottom of the card is clipped away.
+ */
+export function centerPipY(h: number, opts?: { half?: boolean }): number {
+  if (!opts?.half) return h / 2;
+  return h * HALF_VISIBLE_RATIO * HALF_PIP_BAND_RATIO;
 }

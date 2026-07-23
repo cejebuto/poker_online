@@ -2315,26 +2315,54 @@ button.small {
   }
 }
 
-@keyframes card-reveal {
-  from {
+/* Hole cards arrive from the middle of the table, where the deck would be. */
+@keyframes card-deal-deck {
+  0% {
     opacity: 0;
-    transform: rotateY(70deg) scale(0.85);
+    transform: translate3d(0, -40vh, 0) rotate(-16deg) scale(0.6);
   }
-  to {
+  55% {
+    opacity: 1;
+  }
+  100% {
     opacity: 1;
     transform: none;
   }
 }
 
-@keyframes card-flip {
+/*
+ * The board turning over: edge-on, a flash of the felt light across the face,
+ * then a slight overshoot as it settles. Slow on purpose — this is the beat
+ * everyone at the table is waiting for.
+ */
+@keyframes card-reveal {
   0% {
-    transform: rotateY(0);
+    opacity: 0;
+    transform: rotateY(92deg) translateY(-5px) scale(0.9);
+    filter: brightness(1.6);
   }
-  50% {
-    transform: rotateY(90deg);
+  55% {
+    opacity: 1;
+  }
+  72% {
+    transform: rotateY(-9deg) translateY(0) scale(1.05);
   }
   100% {
-    transform: rotateY(0);
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes card-flip {
+  0% {
+    transform: rotateY(0) scale(1);
+  }
+  50% {
+    transform: rotateY(90deg) scale(1.07);
+  }
+  100% {
+    transform: rotateY(0) scale(1);
   }
 }
 
@@ -2342,12 +2370,26 @@ button.small {
   animation: card-deal 0.35s ease-out both;
 }
 
+.card-anim-deal-deck {
+  animation: card-deal-deck 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 .card-anim-reveal {
-  animation: card-reveal 0.4s ease-out both;
+  animation: card-reveal 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .card-anim-flip {
-  animation: card-flip 0.45s ease-in-out both;
+  animation: card-flip 0.5s ease-in-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-anim-deal,
+  .card-anim-deal-deck,
+  .card-anim-reveal,
+  .card-anim-flip {
+    animation-duration: 0.01ms;
+    animation-delay: 0ms !important;
+  }
 }
 
 /* Portrait: stack community above holes; landscape: side by side */
@@ -3050,7 +3092,11 @@ select {
   border-radius: 0.9rem;
   padding: 0.4rem 0.45rem 0.5rem;
   display: grid;
-  grid-template-rows: minmax(0, 2fr) minmax(0, 4fr) minmax(0, 4fr);
+  /*
+   * Z3 carries my seat strip on top of the cards and the action bar, and Z2 is
+   * mostly empty felt between the rails — so the hero zone gets the extra room.
+   */
+  grid-template-rows: minmax(0, 2fr) minmax(0, 3.4fr) minmax(0, 4.6fr);
   gap: 0.35rem;
   color: #e6f2ec;
   isolation: isolate;
@@ -3064,11 +3110,11 @@ select {
   overflow: hidden;
 }
 
-/* Z1 — community cards */
+/* Z1 — community cards (keep ≤20% of felt; cards claim almost all of that) */
 .felt-z1 {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.12rem;
   align-items: stretch;
 }
 
@@ -3076,15 +3122,15 @@ select {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   flex-shrink: 0;
 }
 
 .felt-blinds-pill {
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 0.2rem 0.45rem;
+  padding: 0.12rem 0.4rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -3093,15 +3139,22 @@ select {
 
 .felt-street-badge {
   justify-self: center;
-  font-size: 0.72rem;
+  font-size: 0.64rem;
   font-weight: 900;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  padding: 0.28rem 0.75rem;
-  border-radius: 0.45rem 0.45rem 0 0;
+  padding: 0.18rem 0.65rem;
+  border-radius: 0.4rem 0.4rem 0 0;
   color: #1a2e1c;
   background: linear-gradient(180deg, #e8d5a0 0%, #c9b07a 100%);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.felt-z1 .felt-menu {
+  width: 1.85rem;
+  height: 1.85rem;
+  font-size: 0.95rem;
+  padding: 0;
 }
 
 .felt-z1 .felt-community {
@@ -3110,23 +3163,54 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Cards own the leftover vertical space of Z1 */
+  overflow: hidden;
 }
 
 .felt-z1 .felt-community .community-row,
 .felt-z1 .felt-community .cards {
   justify-content: center;
+  align-items: center;
   flex-wrap: nowrap;
+  gap: clamp(0.18rem, 1.4vw, 0.4rem);
+  margin: 0;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.felt-z1 .felt-community {
+  container-type: size;
+}
+
+/* Grow the board to fill Z1 height/width (md face 64×90; five-wide ~340px). */
+.felt-z1 .felt-community .community-row {
+  transform: scale(min(1.32, 100cqh / 90px, 100cqw / 340px));
+  transform-origin: center center;
+}
+
+.felt-z1 .felt-community .community-row:has(.playing-card[data-half='true']) {
+  gap: clamp(0.1rem, 0.8vw, 0.22rem);
+  /* half cards are shorter (~50–56% height) and wider after halfScale */
+  transform: scale(min(1.38, 100cqh / 56px, 100cqw / 360px));
 }
 
 .felt-last-action {
   margin: 0;
   flex-shrink: 0;
   text-align: center;
-  font-size: 0.7rem;
+  font-size: 0.62rem;
+  line-height: 1.15;
   color: #a7c4b4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-height: 1.1em;
+}
+
+@media (max-height: 680px) {
+  .felt-z1 .felt-last-action {
+    display: none;
+  }
 }
 
 /* Z2 — opponents + pot */
@@ -3177,6 +3261,80 @@ select {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
+/* Right rail: name/stack first, avatar last (facing the pot). */
+.felt-seat-pill--right {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.felt-seat-pill--right .felt-seat-pill-info {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.felt-seat-pill--right .felt-seat-pill-name {
+  flex-direction: row-reverse;
+}
+
+/* Showdown: hole cards live on the seat pill (no bottom list). */
+.felt-seat-pill.revealing {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 0.28rem 0.32rem;
+}
+
+.felt-seat-pill--right.revealing {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.felt-seat-pill.is-winner {
+  border-color: rgba(251, 191, 36, 0.75);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.35),
+    0 2px 10px rgba(0, 0, 0, 0.28);
+}
+
+.felt-seat-hole {
+  display: flex;
+  flex-direction: row;
+  gap: 0.08rem;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.felt-seat-hole .playing-card {
+  /* Keep showdown holes tiny so Z2 rails don't explode */
+  transform: scale(0.72);
+  transform-origin: center center;
+  margin: -0.15rem -0.2rem;
+}
+
+.felt-seat-hand-label {
+  font-size: 0.55rem;
+  font-weight: 600;
+  color: #c8e6d4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.felt-seat-win {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0.05rem 0.28rem;
+  border-radius: 999px;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #1a2e1c;
+  background: linear-gradient(180deg, #fde68a 0%, #fbbf24 100%);
+  vertical-align: middle;
+}
+
+.felt-seat-pill--right .felt-seat-win {
+  margin-left: 0;
+  margin-right: 0.25rem;
+}
+
 .felt-seat-pill.acting {
   border-color: #4ade80;
   box-shadow: 0 0 0 1px #4ade8088, 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -3213,6 +3371,7 @@ select {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   line-height: 1.15;
 }
 
@@ -3357,33 +3516,104 @@ select {
 .felt-z3 .felt-hole {
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 0.45rem;
-  align-items: center;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
   margin: 0;
   padding: 0.2rem 0.15rem;
 }
 
-.felt-z3 .felt-hole .cards {
+/*
+ * My two cards never stack. Half cards are ~1.35× wider than a normal one, so
+ * the pair used to wrap onto a second row on a narrow phone; the container
+ * query shrinks them to fit instead.
+ */
+.felt-z3 .felt-hole .felt-hole-cards {
+  position: relative;
+  /*
+   * Needs definite width and height: size containment stops the box from
+   * sizing itself to the cards, and a collapsed container makes 100cqw/100cqh
+   * zero — which scales the pair down to nothing.
+   */
+  width: 100%;
+  height: 100%;
+  container-type: size;
+  min-width: 0;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 0.35rem;
 }
 
-.felt-hole-side {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.3rem;
-  min-width: 0;
+.felt-z3 .felt-hole .cards {
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  margin: 0;
+  /* Full lg pair ≈ 204 × 134. Shrink to whichever axis runs out first. */
+  transform: scale(min(1, 100cqw / 204px, 100cqh / 134px));
+  transform-origin: center center;
+}
+
+.felt-z3 .felt-hole .cards:has(.playing-card[data-half='true']) {
+  gap: 0.25rem;
+  /* Half-card pair ≈ 268 × 101 (wider and shorter). */
+  transform: scale(min(1, 100cqw / 268px, 100cqh / 101px));
+}
+
+/* Peek hint over face-down hole cards — the cards are dealt covered. */
+.felt-hole-peek {
+  position: absolute;
+  bottom: 0.15rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.14rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: #e8f5ec;
+  background: rgba(4, 18, 12, 0.82);
+  border: 1px solid rgba(74, 222, 128, 0.45);
+  pointer-events: none;
+  animation: felt-peek-breathe 1.8s ease-in-out infinite;
+}
+
+@keyframes felt-peek-breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .felt-hole-peek {
+    animation: none;
+  }
 }
 
 .felt-z3 .felt-stack-target {
-  padding: 0.35rem 0.5rem;
+  padding: 0.3rem 0.4rem;
   border-radius: 0.65rem;
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.08);
   text-align: center;
+}
+
+/* Label and number own a line each — inline they wrapped mid-phrase. */
+.felt-z3 .felt-stack-target .felt-label,
+.felt-z3 .felt-stack-target strong {
+  display: block;
+  line-height: 1.15;
+}
+
+.felt-z3 .felt-stack-target strong {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .felt-z3 .felt-my-hand {
@@ -3682,48 +3912,222 @@ select {
   color: #fbbf24;
 }
 
+/*
+ * The pot is chips on felt, not a labelled box: no border, no "Bote principal".
+ * The amount under the pile carries the number; the label survives as the
+ * aria-label so a screen reader still hears which pot it is.
+ */
 .felt-pots {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-top: 0.55rem;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 0;
 }
 
 .felt-pot-chip {
-  min-width: 6.5rem;
-  padding: 0.45rem 0.7rem;
-  border-radius: 0.65rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  padding: 0.1rem 0.3rem;
+  min-width: 0;
   text-align: center;
-  background: #052016ee;
-  border: 1px solid #1f7a4d;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
-.felt-pot-chip.main {
-  border-color: #4ade80;
-  background: linear-gradient(160deg, #0a3d28ee, #052016ee);
+/* Pool of shadow under the pile so the chips sit on the cloth. */
+.felt-pot-chip::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0.9rem;
+  width: 4.5rem;
+  height: 0.9rem;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.5), transparent 72%);
+  pointer-events: none;
 }
 
-.felt-pot-chip.side {
-  border-color: #38bdf8;
+.felt-pot-chip.side::before {
+  width: 3.2rem;
+  height: 0.7rem;
 }
 
-.felt-pot-flyer {
-  will-change: transform, opacity;
+.felt-pot-chip .felt-pot-amount {
+  position: relative;
+  font-size: 1.3rem;
+  line-height: 1.05;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
-.felt-pot-flyer-inner {
-  display: block;
-  text-align: center;
+.felt-pot-chip.side .felt-pot-amount {
+  font-size: 0.9rem;
+  color: #7dd3fc;
+}
+
+.felt-pot-tag {
+  font-size: 0.5rem;
   font-weight: 800;
-  font-size: 0.95rem;
-  color: #bbf7d0;
-  background: linear-gradient(160deg, #166534, #052016);
-  border: 1px solid #4ade80;
-  border-radius: 999px;
-  padding: 0.45rem 0.75rem;
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.35);
+  letter-spacing: 0.08em;
+  color: #38bdf8;
+  text-transform: uppercase;
+}
+
+/* A chip in the air — bet going in, or pot coming out. */
+.chip-fly {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+  border-radius: 50%;
+  /* Dashes read as the edge spots of a real clay chip at this size. */
+  border: 2px dashed;
+  pointer-events: none;
+  z-index: 70;
+  will-change: transform;
+}
+
+/* Small pile of physical chips (pot, my stack). Decorative only. */
+.chip-mini {
+  --chip-mini-w: 1.35rem;
+  --chip-mini-h: 0.42rem;
+  --chip-mini-lift: 0.22rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.2rem;
+  pointer-events: none;
+}
+
+.chip-mini.size-xs {
+  --chip-mini-w: 0.95rem;
+  --chip-mini-h: 0.3rem;
+  --chip-mini-lift: 0.16rem;
+  gap: 0.14rem;
+}
+
+.chip-mini.size-md {
+  --chip-mini-w: 1.7rem;
+  --chip-mini-h: 0.52rem;
+  --chip-mini-lift: 0.28rem;
+}
+
+.chip-mini-col {
+  position: relative;
+  flex: none;
+  width: var(--chip-mini-w);
+  /* Room for the tallest column planMiniStack can return. */
+  height: calc(var(--chip-mini-h) + var(--chip-mini-lift) * 4);
+}
+
+.chip-mini-disc {
+  position: absolute;
+  left: 0;
+  width: var(--chip-mini-w);
+  height: var(--chip-mini-h);
+  border-radius: 50%;
+  border: 1px solid;
+}
+
+.felt-my-chips {
+  margin-bottom: 0.15rem;
+}
+
+/* Circular turn clock, drawn around whoever is on the clock. */
+.countdown-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.countdown-ring-svg {
+  position: absolute;
+  inset: 0;
+  /* Start the arc at 12 o'clock and run it clockwise. */
+  transform: rotate(-90deg);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.countdown-ring-track {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.countdown-ring-arc {
+  stroke: #38bdf8;
+  filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.55));
+}
+
+.countdown-ring.mine .countdown-ring-arc {
+  stroke: #4ade80;
+  filter: drop-shadow(0 0 4px rgba(74, 222, 128, 0.65));
+}
+
+.countdown-ring.danger .countdown-ring-arc {
+  stroke: #f87171;
+  filter: drop-shadow(0 0 5px rgba(248, 113, 113, 0.7));
+}
+
+.countdown-ring.danger {
+  animation: countdown-ring-alarm 0.7s ease-in-out infinite;
+}
+
+.countdown-ring-body {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+}
+
+@keyframes countdown-ring-alarm {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .countdown-ring.danger {
+    animation: none;
+  }
+}
+
+/*
+ * My seat: avatar + clock, my physical chips over my stack, and the hand I
+ * hold. Always on screen, including between hands — it is where the pot lands.
+ */
+.felt-hero-seat {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.15rem 0.25rem;
+  min-width: 0;
+}
+
+.felt-hero-seat .felt-my-hand {
+  margin: 0;
+  text-align: right;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-height: 680px) {
+  .felt-hero-seat {
+    gap: 0.35rem;
+  }
 }
 
 .felt-stack-target {
@@ -4330,6 +4734,43 @@ select {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.4rem;
+}
+
+.felt-menu-check {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(201, 176, 122, 0.28);
+  background: rgba(6, 18, 12, 0.45);
+  color: #e8efe8;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.felt-menu-check input {
+  margin-top: 0.15rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: #c9b07a;
+  flex-shrink: 0;
+}
+
+.felt-menu-check span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.felt-menu-check small {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #a8b8a8;
+  line-height: 1.3;
 }
 
 /*

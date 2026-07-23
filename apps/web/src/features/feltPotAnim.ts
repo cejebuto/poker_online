@@ -12,8 +12,13 @@ export type PotFlight = {
   key: string;
   label: string;
   amount: number;
-  /** Magnet toward hero stack, or vanish (lost / other winners). */
-  outcome: 'magnet' | 'vanish';
+  /**
+   * Where this pot goes: `magnet` to my own stack, `seat` to another player's
+   * seat, `vanish` only when nobody can be found to hand it to.
+   */
+  outcome: 'magnet' | 'seat' | 'vanish';
+  /** Seat the chips fly to, when it is not mine. */
+  toSeat: number | null;
   /** Share of my total payout attributed to this pot (for stack count-up). */
   credit: number;
 };
@@ -41,10 +46,10 @@ export function resolvePotList(
 }
 
 /**
- * Decide magnet vs vanish per pot for the local hero.
- * - No payout → all vanish
- * - Won + eligible (or empty eligibility) → magnet
- * - Won but not eligible for that pot → vanish (other side pot)
+ * Decide where every pot flies, from the local hero's point of view.
+ * - Won + eligible (or empty eligibility) → magnet, to my own stack
+ * - Otherwise → the seat of the winner who took that pot
+ * - Nobody eligible / empty pot → vanish
  */
 export function buildPotFlights(input: {
   pots: readonly PublicPotLike[];
@@ -52,6 +57,8 @@ export function buildPotFlights(input: {
   mySeat: number | null;
   winners: readonly number[];
   myPayout: number;
+  /** Used to pick which winner a shared pot flies to. */
+  payouts?: Record<number, number>;
 }): PotFlight[] {
   const list = resolvePotList(input.pots, input.potTotal);
   const iWon = input.mySeat !== null && input.myPayout > 0;
@@ -60,18 +67,58 @@ export function buildPotFlights(input: {
     const eligible =
       p.eligibleSeats.length === 0 ||
       (input.mySeat !== null && p.eligibleSeats.includes(input.mySeat));
-    const outcome: PotFlight['outcome'] =
-      iWon && eligible && p.amount > 0 ? 'magnet' : 'vanish';
+
+    let outcome: PotFlight['outcome'] = 'vanish';
+    let toSeat: number | null = null;
+
+    if (p.amount > 0) {
+      if (iWon && eligible) {
+        outcome = 'magnet';
+        toSeat = input.mySeat;
+      } else {
+        const winner = potWinnerSeat(p, input.winners, input.payouts);
+        if (winner !== null) {
+          outcome = 'seat';
+          toSeat = winner;
+        }
+      }
+    }
+
     return {
       key: `pot-${i}`,
       label: potLabel(i),
       amount: p.amount,
       outcome,
+      toSeat,
       credit: 0,
     };
   });
 
   return assignPayoutCredits(raw, input.myPayout);
+}
+
+/**
+ * Which seat takes this pot. A split goes to whoever was paid most (lowest
+ * seat breaks the tie) — one destination reads better than chips forking
+ * mid-air, and the seat pills already announce the split in text.
+ */
+export function potWinnerSeat(
+  pot: PublicPotLike,
+  winners: readonly number[],
+  payouts?: Record<number, number>,
+): number | null {
+  const eligible = winners.filter(
+    (seat) => pot.eligibleSeats.length === 0 || pot.eligibleSeats.includes(seat),
+  );
+  if (eligible.length === 0) return null;
+
+  return eligible.reduce((best, seat) => {
+    const bestPay = payouts?.[best] ?? 0;
+    const seatPay = payouts?.[seat] ?? 0;
+    if (seatPay > bestPay) return seat;
+    if (seatPay === bestPay && seat < best) return seat;
+    return best;
+  }, eligible[0]!);
 }
 
 /** Split my total payout across magnet pots proportional to pot amounts. */

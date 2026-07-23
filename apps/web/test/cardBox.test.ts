@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { CardSize } from '@poker/shared';
-import { cardBox, HALF_VISIBLE_RATIO } from '../src/cards/cardBox.js';
+import { cardBox, centerPipY, HALF_VISIBLE_RATIO } from '../src/cards/cardBox.js';
 import { CARD_PX } from '../src/cards/CardTheme.js';
 
 const SIZES: CardSize[] = ['sm', 'md', 'lg'];
@@ -60,5 +60,32 @@ describe('cardBox — half card', () => {
     const box = cardBox('sm', { half: true, scale: 0 });
     assert.ok(box.w > 0, `width was ${box.w}`);
     assert.ok(box.h > 0, `height was ${box.h}`);
+  });
+});
+
+describe('centerPipY', () => {
+  it('centres the pip on a full card', () => {
+    assert.equal(centerPipY(134), 67);
+    assert.equal(centerPipY(134, { half: false }), 67);
+  });
+
+  it('lifts the pip into the visible band of a half card', () => {
+    for (const size of SIZES) {
+      const { h } = CARD_PX[size];
+      const y = centerPipY(h, { half: true });
+      assert.ok(y < h / 2, `${size}: pip must rise above the card centre`);
+      assert.ok(y > 0, `${size}: pip must stay on the card`);
+    }
+  });
+
+  it('keeps the whole glyph inside the clipped box', () => {
+    // The theme draws the symbol centred on this y; lg uses a 42px glyph.
+    const { h } = CARD_PX.lg;
+    const glyph = 42;
+    const bottomOfGlyph = centerPipY(h, { half: true }) + glyph / 2;
+    assert.ok(
+      bottomOfGlyph < h * HALF_VISIBLE_RATIO,
+      `glyph ends at ${bottomOfGlyph}, card is cut at ${h * HALF_VISIBLE_RATIO}`,
+    );
   });
 });

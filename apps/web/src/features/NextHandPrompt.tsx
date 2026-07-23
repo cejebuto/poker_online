@@ -35,12 +35,15 @@ export function NextHandPrompt({
   onReady,
   onForceStart,
   onRebuy,
+  autoNextHand = false,
 }: {
   state: PublicRoomState;
   playerId: string;
   onReady: (ready: boolean) => void;
   onForceStart: () => void;
   onRebuy?: () => void;
+  /** Host preference: next hand starts alone after ~2s. */
+  autoNextHand?: boolean;
 }) {
   const next = state.nextHand;
   if (!isBetweenHands(state) || !next) return null;
@@ -51,13 +54,14 @@ export function NextHandPrompt({
   const iAmWaited = waiting.some((p) => p.playerId === playerId);
   const enoughPlayers = next.needed >= 2;
   const showRebuy = Boolean(onRebuy) && canPlayerRebuy(state, playerId);
+  const autoDealing = autoNextHand && isHost && enoughPlayers;
 
   return (
     <section className="next-hand">
       <div className="row between">
-        <strong>¿Jugamos otra?</strong>
+        <strong>{autoDealing ? 'Siguiente mano…' : '¿Jugamos otra?'}</strong>
         <span className="meta">
-          {next.ready}/{next.needed} listos
+          {autoDealing ? 'en 2s' : `${next.ready}/${next.needed} listos`}
         </span>
       </div>
 
@@ -65,11 +69,15 @@ export function NextHandPrompt({
         <p className="meta">Faltan jugadores con fichas para repartir.</p>
       )}
 
+      {autoDealing ? (
+        <p className="meta">Partida automática: se reparte en 2 segundos.</p>
+      ) : null}
+
       {showRebuy ? (
         <p className="meta">Te quedaste sin fichas. Recomprá para seguir jugando.</p>
       ) : null}
 
-      {waiting.length && enoughPlayers ? (
+      {!autoDealing && waiting.length && enoughPlayers ? (
         <p className="meta">
           Esperando a {waiting.map((p) => p.displayName).join(', ')}
         </p>
@@ -82,19 +90,26 @@ export function NextHandPrompt({
           </button>
         ) : null}
 
-        {me && iAmWaited ? (
+        {!autoDealing && me && iAmWaited ? (
           <button type="button" className="primary" onClick={() => onReady(true)}>
             Jugar otra
           </button>
-        ) : me && me.ready ? (
+        ) : null}
+        {!autoDealing && me && me.ready ? (
           <button type="button" className="ghost" onClick={() => onReady(false)}>
             Listo ✓ · cancelar
           </button>
         ) : null}
 
-        {isHost && enoughPlayers && waiting.length > 0 ? (
+        {!autoDealing && isHost && enoughPlayers && waiting.length > 0 ? (
           <button type="button" className="ghost" onClick={onForceStart}>
             Empezar sin esperar
+          </button>
+        ) : null}
+
+        {autoDealing ? (
+          <button type="button" className="ghost" onClick={onForceStart}>
+            Repartir ya
           </button>
         ) : null}
       </div>

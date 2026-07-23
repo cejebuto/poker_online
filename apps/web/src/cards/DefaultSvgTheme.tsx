@@ -1,7 +1,8 @@
 import type { Card, CardSize, Suit } from '@poker/shared';
 import { isRedSuit, SUIT_SYMBOL } from '@poker/shared';
-import type { CardTheme } from './CardTheme';
+import type { CardRenderOptions, CardTheme } from './CardTheme';
 import { CARD_PX } from './CardTheme';
+import { centerPipY } from './cardBox';
 
 const SUIT_COLOR: Record<Suit, string> = {
   hearts: '#dc2626',
@@ -10,7 +11,15 @@ const SUIT_COLOR: Record<Suit, string> = {
   spades: '#0f172a',
 };
 
-function FaceSvg({ card, size }: { card: Card; size: CardSize }) {
+function FaceSvg({
+  card,
+  size,
+  half = false,
+}: {
+  card: Card;
+  size: CardSize;
+  half?: boolean;
+}) {
   const { w, h } = CARD_PX[size];
   const color = SUIT_COLOR[card.suit];
   const symbol = SUIT_SYMBOL[card.suit];
@@ -18,6 +27,7 @@ function FaceSvg({ card, size }: { card: Card; size: CardSize }) {
   const cornerFs = size === 'sm' ? 10 : size === 'md' ? 13 : 18;
   const centerFs = size === 'sm' ? 18 : size === 'md' ? 28 : 42;
   const pad = size === 'sm' ? 3 : 5;
+  const pipY = centerPipY(h, { half });
 
   return (
     <svg
@@ -59,7 +69,7 @@ function FaceSvg({ card, size }: { card: Card; size: CardSize }) {
       </text>
       <text
         x={w / 2}
-        y={h / 2 + centerFs * 0.35}
+        y={pipY + centerFs * 0.35}
         textAnchor="middle"
         fill={color}
         fontSize={centerFs}
@@ -94,9 +104,10 @@ function FaceSvg({ card, size }: { card: Card; size: CardSize }) {
   );
 }
 
-function BackSvg({ size }: { size: CardSize }) {
+function BackSvg({ size, half = false }: { size: CardSize; half?: boolean }) {
   const { w, h } = CARD_PX[size];
   const rx = size === 'sm' ? 4 : 8;
+  const pipY = centerPipY(h, { half });
   return (
     <svg
       width={w}
@@ -115,7 +126,7 @@ function BackSvg({ size }: { size: CardSize }) {
       <rect x={4} y={4} width={w - 8} height={h - 8} rx={rx - 2} fill={`url(#backpat-${size})`} />
       <text
         x={w / 2}
-        y={h / 2 + 6}
+        y={pipY + 6}
         textAnchor="middle"
         fill="#e2e8f0"
         fontSize={size === 'sm' ? 14 : 22}
@@ -129,10 +140,10 @@ function BackSvg({ size }: { size: CardSize }) {
 export const defaultSvgTheme: CardTheme = {
   id: 'default-svg',
   name: 'Default SVG',
-  renderFace(card, size) {
-    return <FaceSvg card={card} size={size} />;
+  renderFace(card, size, opts?: CardRenderOptions) {
+    return <FaceSvg card={card} size={size} half={opts?.half} />;
   },
-  renderBack(size) {
-    return <BackSvg size={size} />;
+  renderBack(size, opts?: CardRenderOptions) {
+    return <BackSvg size={size} half={opts?.half} />;
   },
 };

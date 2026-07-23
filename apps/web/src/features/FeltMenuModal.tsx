@@ -11,8 +11,11 @@ export type FeltMenuModalProps = {
   playerId: string;
   feltThemeId: string;
   equityOn: boolean;
+  /** Host: auto-start next hand ~2s after the first. */
+  autoNextHand: boolean;
   onFeltTheme: (id: string) => void;
   onEquity: (on: boolean) => void;
+  onAutoNextHand: (on: boolean) => void;
   onClose: () => void;
   onOpenThemes: () => void;
   onSwitchView: () => void;
@@ -31,8 +34,10 @@ export function FeltMenuModal({
   playerId,
   feltThemeId,
   equityOn,
+  autoNextHand,
   onFeltTheme,
   onEquity,
+  onAutoNextHand,
   onClose,
   onOpenThemes,
   onSwitchView,
@@ -41,6 +46,7 @@ export function FeltMenuModal({
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const { play, muted, toggleMuted } = useJuice();
+  const isHost = state.hostPlayerId === playerId;
 
   useEffect(() => {
     if (!open) return;
@@ -120,6 +126,22 @@ export function FeltMenuModal({
           <section className="felt-menu-section">
             <p className="felt-label">Opciones</p>
             <div className="felt-menu-options">
+              {isHost ? (
+                <label className="felt-menu-check">
+                  <input
+                    type="checkbox"
+                    checked={autoNextHand}
+                    onChange={(e) => {
+                      onAutoNextHand(e.target.checked);
+                      play('tick');
+                    }}
+                  />
+                  <span>
+                    Partida automática
+                    <small> Tras la 1ª mano, espera 2s y reparte otra</small>
+                  </span>
+                </label>
+              ) : null}
               <button
                 type="button"
                 className="ghost small"

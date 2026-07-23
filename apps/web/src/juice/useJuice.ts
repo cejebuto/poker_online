@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useSound } from 'use-sound';
+import { playChipSound, unlockChipAudio, type ChipSoundKind } from './chipAudio';
 import { type HapticKind, playHaptic } from './haptic';
-import { loadSfxMuted, saveSfxMuted } from './soundPrefs';
+import { getSfxMuted, setSfxMuted, subscribeSfxMuted } from './soundPrefs';
 
 export type JuiceKind = 'tick' | 'step' | 'confirm' | 'error' | 'throw';
 
@@ -13,17 +14,21 @@ const HAPTIC_FOR: Record<JuiceKind, HapticKind> = {
   throw: 'heavy',
 };
 
+/** Chips and cards get a haptic only when they represent one of my own moves. */
+const CHIP_HAPTIC: Partial<Record<ChipSoundKind, HapticKind>> = {
+  place: 'step',
+  sweep: 'confirm',
+};
+
 /**
- * Coordinated juice: haptic + short SFX (samples in /public/sfx).
- * Muted state persists via soundPrefs; first play must stay on a user gesture.
+ * Coordinated juice: haptic + short SFX.
+ *
+ * UI sounds are samples in /public/sfx; chips and cards are synthesised in
+ * chipAudio so a line of them never sounds like the same file on repeat.
+ * Mute lives in a shared store, so muting anywhere mutes everywhere at once.
  */
 export function useJuice() {
-  const [muted, setMutedState] = useState(false);
-
-  useEffect(() => {
-    setMutedState(loadSfxMuted());
-  }, []);
-
+  const muted = useSyncExternalStore(subscribeSfxMuted, getSfxMuted, () => false);
   const soundEnabled = !muted;
 
   const [playTick] = useSound('/sfx/tick.wav', { soundEnabled, volume: 0.32 });
@@ -51,6 +56,9 @@ export function useJuice() {
   const play = useCallback(
     (kind: JuiceKind) => {
       playHaptic(HAPTIC_FOR[kind]);
+      // Every UI sound rides a tap, which is the only moment a browser lets us
+      // start the audio graph the chips will need later.
+      unlockChipAudio();
       if (muted) return;
       try {
         players[kind]();
@@ -61,18 +69,22 @@ export function useJuice() {
     [muted, players],
   );
 
+  const playChip = useCallback(
+    (kind: ChipSoundKind, opts?: { pitch?: number; gain?: number }) => {
+      const feel = CHIP_HAPTIC[kind];
+      if (feel) playHaptic(feel);
+      playChipSound(kind, opts);
+    },
+    [],
+  );
+
   const setMuted = useCallback((next: boolean) => {
-    setMutedState(next);
-    saveSfxMuted(next);
+    setSfxMuted(next);
   }, []);
 
   const toggleMuted = useCallback(() => {
-    setMutedState((prev) => {
-      const next = !prev;
-      saveSfxMuted(next);
-      return next;
-    });
+    setSfxMuted(!getSfxMuted());
   }, []);
 
-  return { play, muted, setMuted, toggleMuted };
+  return { play, playChip, muted, setMuted, toggleMuted };
 }

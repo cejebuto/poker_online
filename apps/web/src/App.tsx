@@ -16,6 +16,11 @@ import { backFor, needsLeaveConfirm, type Screen } from './features/navigation';
 import { FeltView } from './features/FeltView';
 import { describeAction } from './features/feltStats';
 import { loadPlayViewMode, savePlayViewMode, type PlayViewMode } from './features/viewMode';
+import {
+  AUTO_NEXT_HAND_MS,
+  loadAutoNextHand,
+  saveAutoNextHand,
+} from './features/autoNextHand';
 import { ThemeSettings } from './cards/ThemeSettings';
 
 type User = { displayName: string; avatar: string };
@@ -38,10 +43,13 @@ export function App() {
   const [themesReturn, setThemesReturn] = useState<Screen>('home');
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
   const [playView, setPlayView] = useState<PlayViewMode>(() => loadPlayViewMode());
+  const [autoNextHand, setAutoNextHand] = useState(() => loadAutoNextHand());
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [pickedRoom, setPickedRoom] = useState<string | undefined>(undefined);
   const wsRef = useRef<WsHandle | null>(null);
   const resumeAttempted = useRef(false);
+  /** Prevents double auto-start for the same completed hand. */
+  const autoNextTokenRef = useRef<string | null>(null);
   const prefill = useMemo(() => joinRoomIdFromPath(), []);
 
   const openThemes = (from: Screen) => {
@@ -210,6 +218,35 @@ export function App() {
   useEffect(() => {
     if (screen === 'home') wsRef.current?.send({ type: 'rooms:list' });
   }, [screen]);
+
+  // Host + partida automática: after the first hand (nextHand present), wait 2s and deal.
+  useEffect(() => {
+    if (!autoNextHand || !roomState || !playerId) return;
+    if (roomState.hostPlayerId !== playerId) return;
+    if (roomState.phase !== 'LOBBY' || !roomState.nextHand) return;
+    if ((roomState.nextHand.needed ?? 0) < 2) return;
+
+    const token = `${roomState.roomId}:${roomState.hand?.handId ?? 'between'}`;
+    if (autoNextTokenRef.current === token) return;
+
+    const t = window.setTimeout(() => {
+      autoNextTokenRef.current = token;
+      setNotice('');
+      setError('');
+      wsRef.current?.send({ type: 'hand:start' });
+    }, AUTO_NEXT_HAND_MS);
+
+    return () => window.clearTimeout(t);
+  }, [
+    autoNextHand,
+    playerId,
+    roomState?.phase,
+    roomState?.nextHand?.needed,
+    roomState?.nextHand?.ready,
+    roomState?.hand?.handId,
+    roomState?.roomId,
+    roomState?.hostPlayerId,
+  ]);
 
   if (!user && screen === 'user') {
     return (
@@ -380,6 +417,7 @@ export function App() {
         <Lobby
           state={roomState}
           playerId={playerId}
+          autoNextHand={autoNextHand}
           onStart={() => {
             setNotice('');
             send({ type: 'hand:start' });
@@ -403,10 +441,16 @@ export function App() {
               state={roomState}
               playerId={playerId}
               lastAction={lastAction}
+              autoNextHand={autoNextHand}
+              onAutoNextHand={(on) => {
+                setAutoNextHand(on);
+                saveAutoNextHand(on);
+              }}
               nextHandSlot={
                 <NextHandPrompt
                   state={roomState}
                   playerId={playerId}
+                  autoNextHand={autoNextHand}
                   onReady={(ready) => send({ type: 'hand:ready', ready })}
                   onForceStart={() => {
                     setNotice('');
@@ -433,6 +477,7 @@ export function App() {
               <NextHandPrompt
                 state={roomState}
                 playerId={playerId}
+                autoNextHand={autoNextHand}
                 onReady={(ready) => send({ type: 'hand:ready', ready })}
                 onForceStart={() => {
                   setNotice('');

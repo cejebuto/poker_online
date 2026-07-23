@@ -3,7 +3,16 @@ import { motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { PublicPlayer, PublicRoomState } from '@poker/shared';
 import { CommunityRow, PlayingCard } from '../cards/PlayingCard';
+import { ChipStackMini } from '../chips/ChipStackMini';
 import { isSwipeFlip } from '../chips/gestureMath';
+import { centerOf, useChipFlights } from '../juice/ChipFlightLayer';
+import {
+  chipPitch,
+  diffSeatBets,
+  planChipTokens,
+  snapshotSeatBets,
+  type SeatBets,
+} from '../juice/chipFlight';
 import { useJuice } from '../juice/useJuice';
 import { BetAmountModal } from './BetAmountModal';
 import { ConfirmModal } from './ConfirmModal';
@@ -25,14 +34,28 @@ import {
 import { canPlayerRebuy } from './rebuy';
 import { layoutOpponentsForHero } from './opponentLayout';
 import { SEAT_CHIPS, SeatChip, seatChipByToken } from './SeatChip';
-import { buildShowdownRows, describeMyHand, describeWinnerHeadline } from './showdown';
-import { TurnTimer } from './TurnTimer';
+import {
+  buildShowdownRows,
+  describeMyHand,
+  describeWinnerHeadline,
+  type ShowdownRow,
+} from './showdown';
+import { CountdownRing } from './CountdownRing';
 import { WinCelebration } from './WinCelebration';
 import { formatChips, handCounts, potOdds, streetLabel } from './feltStats';
 
 type ActionName = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
 
 type PendingConfirm = 'fold' | 'all-in' | 'amount' | null;
+
+type TurnClockProps = {
+  startedAt?: number;
+  timeoutMs?: number;
+  bankMs?: number;
+};
+
+/** My second card lands after the first, like a dealer going around. */
+const HOLE_DEAL_STAGGER_MS = 120;
 
 /**
  * Player felt — 3 fixed viewport zones (mobile-first):
@@ -54,6 +77,8 @@ export function FeltView({
   onOpenThemes,
   onSwitchView,
   onRebuy,
+  autoNextHand = true,
+  onAutoNextHand,
 }: {
   state: PublicRoomState;
   playerId: string;
@@ -65,8 +90,10 @@ export function FeltView({
   onOpenThemes: () => void;
   onSwitchView: () => void;
   onRebuy?: () => void;
+  autoNextHand?: boolean;
+  onAutoNextHand?: (on: boolean) => void;
 }) {
-  const { play } = useJuice();
+  const { play, playChip } = useJuice();
   const [pending, setPending] = useState<PendingConfirm>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [feltTheme, setFeltTheme] = useState(() => loadFeltTheme());
@@ -82,6 +109,14 @@ export function FeltView({
   const hasTurnTimer = Boolean(
     hand?.turnTimeoutMs && hand.turnTimeoutMs > 0 && !handOver && hand.currentToAct !== null,
   );
+  /** The clock only ever runs for one seat, so one ring is live at a time. */
+  const turn = hasTurnTimer
+    ? {
+        startedAt: hand?.turnStartedAt,
+        timeoutMs: hand?.turnTimeoutMs,
+        bankMs: hand?.actorTimeBankMs,
+      }
+    : null;
 
   useEffect(() => {
     if (!isMyTurn) setPending(null);
@@ -132,8 +167,17 @@ export function FeltView({
   const onFlightJuice = useCallback(
     (kind: 'win' | 'lose') => {
       play(kind === 'win' ? 'confirm' : 'error');
+      if (kind === 'win') playChip('sweep');
     },
-    [play],
+    [play, playChip],
+  );
+
+  /** Every chip of the winning line clinks a little higher than the last. */
+  const onWinChipLand = useCallback(
+    (index: number) => {
+      playChip('land', { pitch: chipPitch(index) });
+    },
+    [playChip],
   );
 
   const stackShown = celebrating ? Math.max(0, stack - myPayout + credited) : stack;
@@ -143,25 +187,86 @@ export function FeltView({
     [state.players, playerId],
   );
 
-  // --- Zone: hole cards (drag-x → flip). ---
+  // --- Chips flying from a seat into the pot when somebody bets. ---
+  const seatRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const potRef = useRef<HTMLDivElement>(null);
+  const betFlights = useChipFlights();
+  const prevBets = useRef<SeatBets>({});
+  const betsHandId = useRef<string | null>(null);
+
+  const registerSeat = useCallback((seat: number, el: HTMLElement | null) => {
+    if (el) seatRefs.current.set(seat, el);
+    else seatRefs.current.delete(seat);
+  }, []);
+
+  const seatTarget = useCallback(
+    (seat: number) => centerOf(seatRefs.current.get(seat)),
+    [],
+  );
+
+  const launchBetFlights = betFlights.launch;
+  useEffect(() => {
+    const nextBets = snapshotSeatBets(state.players);
+    const handId = hand?.handId ?? null;
+
+    // A new hand (or the first snapshot) is a baseline, never a round of bets.
+    if (betsHandId.current !== handId) {
+      betsHandId.current = handId;
+      prevBets.current = nextBets;
+      return;
+    }
+
+    const deltas = diffSeatBets(prevBets.current, nextBets);
+    prevBets.current = nextBets;
+    if (deltas.length === 0) return;
+
+    const pot = centerOf(potRef.current);
+    if (!pot) return;
+
+    for (const { seat, delta } of deltas) {
+      const from =
+        seat === mySeat ? centerOf(stackTargetRef.current) : seatTarget(seat);
+      if (!from) continue;
+
+      const tokens = planChipTokens(delta, { max: 6, staggerMs: 55 });
+      if (tokens.length === 0) continue;
+
+      playChip('slide', { gain: 0.9 });
+      launchBetFlights({
+        from,
+        to: pot,
+        tokens,
+        onChipLand: (i) => playChip('place', { pitch: chipPitch(i) }),
+      });
+    }
+  }, [state.players, hand?.handId, mySeat, seatTarget, launchBetFlights, playChip]);
+
+  // --- Zone: hole cards (tap or drag-x → flip). ---
   const holeZoneRef = useRef<HTMLDivElement>(null);
-  const [holeFaceDown, setHoleFaceDown] = useState(false);
+  /** Cards are dealt covered: at a real table you lift your own corner. */
+  const [holeFaceDown, setHoleFaceDown] = useState(true);
   const [holeFlips, setHoleFlips] = useState(0);
 
   const flipHole = useCallback(() => {
     setHoleFaceDown((down) => !down);
     setHoleFlips((n) => n + 1);
+    playChip('card');
     play('tick');
-  }, [play]);
+  }, [play, playChip]);
 
   useEffect(() => {
-    setHoleFaceDown(false);
+    setHoleFaceDown(true);
+    setHoleFlips(0);
   }, [hand?.handId]);
+
+  /** Set by the touch gesture so the synthetic click it produces is ignored. */
+  const lastGesture = useRef(0);
 
   useDrag(
     ({ movement: [mx], last, canceled, tap }) => {
-      if (tap || canceled || !last) return;
-      if (isSwipeFlip(mx)) flipHole();
+      if (canceled || !last) return;
+      lastGesture.current = Date.now();
+      if (tap || isSwipeFlip(mx)) flipHole();
     },
     {
       target: holeZoneRef,
@@ -169,6 +274,32 @@ export function FeltView({
       filterTaps: true,
       pointer: { touch: true },
     },
+  );
+
+  // The gesture above is touch-only; a mouse still has to be able to peek.
+  const onHoleClick = useCallback(() => {
+    if (Date.now() - lastGesture.current < 400) return;
+    flipHole();
+  }, [flipHole]);
+
+  // Two cards sliding out of the deck, one after the other.
+  const dealtCount = hand?.yourCards?.length ?? 0;
+  useEffect(() => {
+    if (!hand?.handId || dealtCount === 0) return;
+    const timers = Array.from({ length: dealtCount }, (_, i) =>
+      window.setTimeout(
+        () => playChip('card', { pitch: 1 + i * 0.08 }),
+        i * HOLE_DEAL_STAGGER_MS,
+      ),
+    );
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [hand?.handId, dealtCount, playChip]);
+
+  const onCommunityReveal = useCallback(
+    (index: number) => {
+      playChip('card', { pitch: 1 + index * 0.05 });
+    },
+    [playChip],
   );
 
   const myHandName = holeFaceDown ? null : describeMyHand(hand?.yourCards, hand?.community ?? []);
@@ -189,6 +320,11 @@ export function FeltView({
         result,
       })
     : [];
+  const showdownBySeat = useMemo(() => {
+    const map = new Map<number, (typeof showdownRows)[number]>();
+    for (const row of showdownRows) map.set(row.seat, row);
+    return map;
+  }, [showdownRows]);
   const resultText = result ? describeWinnerHeadline(showdownRows, result, state.players) : '';
 
   const passive = passiveAction(toCall);
@@ -275,18 +411,16 @@ export function FeltView({
           </button>
         </header>
 
-        {hasTurnTimer ? (
-          <TurnTimer
-            turnStartedAt={hand?.turnStartedAt}
-            turnTimeoutMs={hand?.turnTimeoutMs}
-            timeBankMs={hand?.actorTimeBankMs}
-            isMyTurn={isMyTurn}
-            active
-          />
-        ) : null}
-
         <div className="felt-community">
-          <CommunityRow cards={hand?.community ?? []} size="sm" max={5} pad halfScale={1.25} />
+          {/* md (~64×90) + CSS scale in Z1; halfScale only applies in half-card mode. */}
+          <CommunityRow
+            cards={hand?.community ?? []}
+            size="md"
+            max={5}
+            pad
+            halfScale={1.1}
+            onReveal={onCommunityReveal}
+          />
         </div>
 
         {lastAction ? <p className="felt-last-action">{lastAction}</p> : null}
@@ -301,8 +435,12 @@ export function FeltView({
                 <FeltSeatPill
                   key={p.playerId}
                   player={p}
+                  side="left"
                   acting={hand?.currentToAct === p.seat}
                   isButton={hand?.button === p.seat}
+                  showdown={p.seat !== null ? showdownBySeat.get(p.seat) : undefined}
+                  onSeatEl={registerSeat}
+                  timer={hand?.currentToAct === p.seat ? turn : null}
                 />
               ) : (
                 <li key={`L${i}`} className="felt-seat-slot" aria-hidden />
@@ -310,7 +448,7 @@ export function FeltView({
             )}
           </ul>
 
-          <div className="felt-z2-center">
+          <div className="felt-z2-center" ref={potRef}>
             <FeltPotDisplay
               pots={pots}
               potTotal={potTotal}
@@ -318,8 +456,10 @@ export function FeltView({
               result={celebrating ? result : null}
               handId={hand?.handId}
               stackTargetRef={stackTargetRef}
+              seatTarget={seatTarget}
               onCredit={onPotCredit}
               onFlightJuice={onFlightJuice}
+              onChipLand={onWinChipLand}
             />
             {resultText ? <p className="felt-result-mini">{resultText}</p> : null}
           </div>
@@ -330,8 +470,12 @@ export function FeltView({
                 <FeltSeatPill
                   key={p.playerId}
                   player={p}
+                  side="right"
                   acting={hand?.currentToAct === p.seat}
                   isButton={hand?.button === p.seat}
+                  showdown={p.seat !== null ? showdownBySeat.get(p.seat) : undefined}
+                  onSeatEl={registerSeat}
+                  timer={hand?.currentToAct === p.seat ? turn : null}
                 />
               ) : (
                 <li key={`R${i}`} className="felt-seat-slot" aria-hidden />
@@ -339,37 +483,6 @@ export function FeltView({
             )}
           </ul>
         </div>
-
-        {showdownRows.length > 0 ? (
-          <ul className="felt-showdown-list felt-scroll">
-            {showdownRows.map((row) => (
-              <li
-                key={row.seat}
-                className={`felt-showdown-row${row.isWinner ? ' is-winner' : ''}`}
-              >
-                <span className="felt-showdown-who">
-                  {row.avatar ? `${row.avatar} ` : ''}
-                  {row.name}
-                </span>
-                <span className="cards">
-                  {row.cards.map((card, i) => (
-                    <PlayingCard
-                      key={i}
-                      card={card}
-                      size="sm"
-                      halfScale={1.15}
-                      animate="reveal"
-                    />
-                  ))}
-                </span>
-                <span className="felt-showdown-hand">{row.categoryLabel}</span>
-                {row.payout > 0 ? (
-                  <span className="felt-showdown-payout accent">+{formatChips(row.payout)}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
 
       {/* ——— Z3: Mi zona (~40%) ——— */}
@@ -405,6 +518,39 @@ export function FeltView({
           )}
         </div>
 
+        {/*
+          My seat lives outside the between-hands swap on purpose: the pot has
+          to have somewhere to fly to at the exact moment the hand ends, and my
+          own stack is the last thing that should ever disappear.
+        */}
+        <div className="felt-hero-seat">
+          <CountdownRing
+            startedAt={isMyTurn ? turn?.startedAt : undefined}
+            timeoutMs={isMyTurn ? turn?.timeoutMs : undefined}
+            bankMs={turn?.bankMs}
+            size={40}
+            mine
+          >
+            <SeatAvatar token={me?.avatar} />
+          </CountdownRing>
+
+          <div ref={stackTargetRef} className="felt-stack-target zone-felt-stack">
+            <ChipStackMini amount={stackShown} size="xs" className="felt-my-chips" />
+            <span className="felt-label">Tu stack</span>
+            <motion.strong
+              className="accent"
+              key={stackShown}
+              initial={celebrating && credited > 0 ? { scale: 1.12 } : false}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+            >
+              {formatChips(stackShown)}
+            </motion.strong>
+          </div>
+
+          <p className="felt-my-hand accent">{myHandName ?? '•••'}</p>
+        </div>
+
         {showRebuy && !betweenHands ? (
           <div className="felt-rebuy">
             <p className="meta">Te quedaste sin fichas.</p>
@@ -426,32 +572,24 @@ export function FeltView({
         ) : (
           <div className="felt-z3-body">
             <div ref={holeZoneRef} className="felt-hole zone-felt-hole">
-              <div className="cards">
-                {(hand?.yourCards ?? [null, null]).map((card, i) => (
-                  <PlayingCard
-                    key={`${holeFlips}-${i}`}
-                    card={card}
-                    faceDown={!card || holeFaceDown}
-                    size="lg"
-                    halfScale={1.35}
-                    animate={holeFlips > 0 ? 'flip' : card ? 'deal' : 'none'}
-                  />
-                ))}
-              </div>
-              <div className="felt-hole-side">
-                <div ref={stackTargetRef} className="felt-stack-target zone-felt-stack">
-                  <span className="felt-label">Tu stack</span>
-                  <motion.strong
-                    className="accent"
-                    key={stackShown}
-                    initial={celebrating && credited > 0 ? { scale: 1.12 } : false}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 420, damping: 22 }}
-                  >
-                    {formatChips(stackShown)}
-                  </motion.strong>
+              {/* Keyboard / screen-reader path is the "Ver" button above. */}
+              <div className="felt-hole-cards" onClick={onHoleClick}>
+                <div className="cards">
+                  {(hand?.yourCards ?? [null, null]).map((card, i) => (
+                    <PlayingCard
+                      key={`${holeFlips}-${i}`}
+                      card={card}
+                      faceDown={!card || holeFaceDown}
+                      size="lg"
+                      halfScale={1.35}
+                      animate={holeFlips > 0 ? 'flip' : card ? 'deal-deck' : 'none'}
+                      animateDelayMs={holeFlips > 0 ? 0 : i * HOLE_DEAL_STAGGER_MS}
+                    />
+                  ))}
                 </div>
-                <p className="felt-my-hand accent">{myHandName ?? '•••'}</p>
+                {holeFaceDown && hand?.yourCards?.length ? (
+                  <span className="felt-hole-peek">Tocá para ver</span>
+                ) : null}
               </div>
             </div>
 
@@ -568,6 +706,8 @@ export function FeltView({
         )}
       </div>
 
+      {betFlights.layer}
+
       <WinCelebration
         open={partyOpen}
         payout={myPayout}
@@ -582,6 +722,7 @@ export function FeltView({
         playerId={playerId}
         feltThemeId={feltTheme.id}
         equityOn={equityOn}
+        autoNextHand={autoNextHand}
         onFeltTheme={(id) => {
           setFeltTheme(resolveFeltTheme(id));
           saveFeltTheme(id);
@@ -589,6 +730,9 @@ export function FeltView({
         onEquity={(on) => {
           setEquityOn(on);
           saveEquityEnabled(on);
+        }}
+        onAutoNextHand={(on) => {
+          onAutoNextHand?.(on);
         }}
         onClose={() => {
           setMenuOpen(false);
@@ -647,49 +791,124 @@ export function FeltView({
 
 function FeltSeatPill({
   player,
+  side,
   acting,
   isButton,
+  showdown,
+  onSeatEl,
+  timer,
 }: {
   player: PublicPlayer;
+  /** Right rail: name first, then avatar (mirrors toward pot). */
+  side: 'left' | 'right';
   acting: boolean;
   isButton: boolean;
+  /** At hand end: hole cards shown next to this seat (no bottom list). */
+  showdown?: ShowdownRow;
+  /** Publishes the avatar node so chips know where to fly. */
+  onSeatEl?: (seat: number, el: HTMLElement | null) => void;
+  /** Set only on the seat that is on the clock. */
+  timer?: TurnClockProps | null;
 }) {
   const folded = player.status === 'FOLDED';
+  const revealing = Boolean(showdown?.cards.length);
+  const seat = player.seat;
+  const avatar = (
+    <CountdownRing
+      startedAt={timer?.startedAt}
+      timeoutMs={timer?.timeoutMs}
+      bankMs={timer?.bankMs}
+      size={34}
+    >
+      <SeatAvatar
+        token={player.avatar}
+        onEl={seat === null || !onSeatEl ? undefined : (el) => onSeatEl(seat, el)}
+      />
+    </CountdownRing>
+  );
+  const hole =
+    revealing && showdown ? (
+      <span className="felt-seat-hole" aria-label={`Cartas de ${player.displayName}`}>
+        {showdown.cards.map((card, i) => (
+          <PlayingCard key={i} card={card} size="sm" halfScale={1.05} animate="reveal" />
+        ))}
+      </span>
+    ) : null;
+
+  const info = (
+    <div className="felt-seat-pill-info">
+      <span className="felt-seat-pill-name">
+        {acting ? '▸ ' : ''}
+        {player.displayName}
+        {isButton ? <span className="felt-dealer">D</span> : null}
+        {showdown?.isWinner ? <span className="felt-seat-win">WIN</span> : null}
+      </span>
+      <span className="felt-seat-pill-stack">{formatChips(player.stack)}</span>
+      {showdown ? (
+        <>
+          <span className="felt-seat-hand-label">{showdown.categoryLabel}</span>
+          {showdown.payout > 0 ? (
+            <span className="felt-seat-pill-bet">+{formatChips(showdown.payout)}</span>
+          ) : null}
+        </>
+      ) : player.betThisRound ? (
+        <span className="felt-seat-pill-bet">{formatChips(player.betThisRound)}</span>
+      ) : folded ? (
+        <span className="felt-seat-pill-bet muted">Fold</span>
+      ) : player.status === 'ALL_IN' ? (
+        <span className="felt-seat-pill-bet">All-in</span>
+      ) : null}
+    </div>
+  );
+
+  // Left: avatar · info · hole. Right: hole · info · avatar (both face the pot).
+  const body =
+    side === 'right' ? (
+      <>
+        {hole}
+        {info}
+        {avatar}
+      </>
+    ) : (
+      <>
+        {avatar}
+        {info}
+        {hole}
+      </>
+    );
+
   return (
     <li
-      className={`felt-seat-pill${acting ? ' acting' : ''}${folded ? ' folded' : ''}`}
+      className={`felt-seat-pill felt-seat-pill--${side}${acting ? ' acting' : ''}${
+        folded ? ' folded' : ''
+      }${showdown?.isWinner ? ' is-winner' : ''}${revealing ? ' revealing' : ''}`}
     >
-      <SeatAvatar token={player.avatar} />
-      <div className="felt-seat-pill-info">
-        <span className="felt-seat-pill-name">
-          {acting ? '▸ ' : ''}
-          {player.displayName}
-          {isButton ? <span className="felt-dealer">D</span> : null}
-        </span>
-        <span className="felt-seat-pill-stack">{formatChips(player.stack)}</span>
-        {player.betThisRound ? (
-          <span className="felt-seat-pill-bet">{formatChips(player.betThisRound)}</span>
-        ) : folded ? (
-          <span className="felt-seat-pill-bet muted">Fold</span>
-        ) : player.status === 'ALL_IN' ? (
-          <span className="felt-seat-pill-bet">All-in</span>
-        ) : null}
-      </div>
+      {body}
     </li>
   );
 }
 
-function SeatAvatar({ token }: { token?: string }) {
+function SeatAvatar({
+  token,
+  onEl,
+}: {
+  token?: string;
+  onEl?: (el: HTMLElement | null) => void;
+}) {
   const known = token && SEAT_CHIPS.some((c) => c.token === token);
   if (known && token) {
     return (
-      <span className="felt-seat-pill-avatar">
+      <span className="felt-seat-pill-avatar" ref={onEl}>
         <SeatChip chip={seatChipByToken(token)} size={28} selected />
       </span>
     );
   }
   return (
-    <span className="felt-seat-pill-avatar felt-seat-pill-avatar--fallback" aria-hidden>
+    <span
+      className="felt-seat-pill-avatar felt-seat-pill-avatar--fallback"
+      ref={onEl}
+      aria-hidden
+    >
       {token && token.length <= 4 ? token : '♠'}
     </span>
   );

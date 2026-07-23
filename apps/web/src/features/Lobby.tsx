@@ -13,6 +13,7 @@ export function Lobby({
   onLeave,
   onKick,
   onRebuy,
+  autoNextHand = false,
 }: {
   state: PublicRoomState;
   playerId: string;
@@ -21,6 +22,7 @@ export function Lobby({
   onLeave: () => void;
   onKick: (id: string) => void;
   onRebuy?: () => void;
+  autoNextHand?: boolean;
 }) {
   const [copied, setCopied] = useState<'code' | 'link' | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
@@ -30,9 +32,12 @@ export function Lobby({
   const readyToDeal =
     state.phase === 'LOBBY' &&
     seated.filter((p) => (p.stack ?? 0) > 0 && p.status !== 'ELIMINATED').length >= 2;
-  const canStart = isHost && state.phase === 'LOBBY' && readyToDeal;
+  /** First deal: host CTA only. After handsPlayed, server sends nextHand. */
+  const firstHandLobby = state.phase === 'LOBBY' && !state.nextHand;
+  const canStart = isHost && firstHandLobby && readyToDeal;
   const canRebuy = Boolean(onRebuy) && canPlayerRebuy(state, playerId);
-  const betweenHands = Boolean(state.lastResult) || Boolean(state.nextHand);
+  /** Ready-up prompt — only when the server exposes nextHand (post first hand). */
+  const betweenHands = Boolean(state.nextHand) && state.phase === 'LOBBY';
 
   const copy = async (kind: 'code' | 'link', value: string) => {
     try {
@@ -163,7 +168,7 @@ export function Lobby({
                   player={p}
                   isMe={p.playerId === playerId}
                   isHostSeat={p.playerId === state.hostPlayerId}
-                  showReady={Boolean(state.lastResult || state.nextHand)}
+                  showReady={betweenHands}
                   canKick={isHost && p.playerId !== playerId && p.status !== 'ELIMINATED'}
                   onKick={() => onKick(p.playerId)}
                 />
@@ -177,6 +182,7 @@ export function Lobby({
             <NextHandPrompt
               state={state}
               playerId={playerId}
+              autoNextHand={autoNextHand}
               onReady={onReady}
               onForceStart={onStart}
               onRebuy={onRebuy}
@@ -186,11 +192,13 @@ export function Lobby({
       </div>
 
       <footer className="lobby-footer">
-        {isHost && state.phase === 'LOBBY' && !state.nextHand ? (
-          <button type="button" className="lobby-cta" disabled={!canStart} onClick={onStart}>
-            Empezar mano
+        {canStart ? (
+          <button type="button" className="lobby-cta" onClick={onStart}>
+            Empezar a Jugar
           </button>
-        ) : state.phase === 'LOBBY' && !state.lastResult && !state.nextHand ? (
+        ) : isHost && firstHandLobby && !readyToDeal ? (
+          <p className="lobby-waiting">Faltan jugadores para empezar…</p>
+        ) : firstHandLobby && !isHost ? (
           <p className="lobby-waiting">Esperando al host…</p>
         ) : null}
 

@@ -133,8 +133,10 @@ export function toPublicRoomState(
     }
   }
 
-  // Only meaningful between hands, where the next-hand prompt is shown.
-  if (room.phase !== 'IN_HAND') {
+  // Between hands only (after at least one deal). A fresh lobby must NOT expose
+  // nextHand — the host starts the first hand with "Empezar a Jugar", not the
+  // ready-up prompt.
+  if (room.phase !== 'IN_HAND' && room.handsPlayed > 0) {
     const summary = readySummary(room);
     if (summary.needed > 0) {
       state.nextHand = { ready: summary.ready, needed: summary.needed };
