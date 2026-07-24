@@ -3287,10 +3287,11 @@ select {
   padding: 0.4rem 0.45rem 0.5rem;
   display: grid;
   /*
-   * Z2 (mesa / oponentes) gets a little more height (+3pp) taken from Z3
-   * hero (−3pp). Baseline was 2 / 3.4 / 4.6.
+   * Hero (Z3) is always side-by-side (cards | actions), so it needs less
+   * vertical budget than a stacked action bar. Extra height goes to Z2
+   * (mesa / oponentes). Tall viewports bump Z2 further below.
    */
-  grid-template-rows: minmax(0, 2fr) minmax(0, 3.7fr) minmax(0, 4.3fr);
+  grid-template-rows: minmax(0, 2fr) minmax(0, 4.6fr) minmax(0, 3.4fr);
   gap: 0.35rem;
   color: #e6f2ec;
   isolation: isolate;
@@ -3663,12 +3664,18 @@ select {
     0 4px 12px #22c55e44;
 }
 
+/*
+ * Always side-by-side: hole cards left, action bar right.
+ * (Previously only under max-height: 700px — tall Safari stacked buttons
+ * under tiny cards while short Brave looked correct.)
+ */
 .felt-z3-body {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.35rem;
 }
 
 .felt-between {
@@ -3685,14 +3692,16 @@ select {
 
 .felt-z3 .felt-hole {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 1 56%;
+  min-width: 0;
   min-height: 0;
   display: flex;
-  /* Cards sit a bit lower so they track avatar + stack, not the live bet. */
+  /* Stretch the card stage; cards stay slightly lower than the live bet. */
+  align-self: stretch;
   align-items: flex-start;
   justify-content: center;
   margin: 0;
-  padding: 0.45rem 0.15rem 0;
+  padding: 0.55rem 0.15rem 0;
 }
 
 /* Hand name sits in the scaled cluster, directly under the pair. */
@@ -3702,7 +3711,7 @@ select {
   max-width: 12rem;
   padding: 0.12rem 0.6rem;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
@@ -3875,24 +3884,32 @@ select {
 }
 
 .felt-z3 .felt-actionbar {
-  flex-shrink: 0;
+  flex: 0 0 44%;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   margin: 0;
   padding: 0;
+  padding-top: 0;
+  /*
+   * Climb into the empty right half of the hero-seat row so Equity / Pot odds
+   * sit high (level with the live-bet slot), separate from the lowered hole cards.
+   * Offset stays stable because the bet slot always reserves height.
+   */
+  margin-top: -2.65rem;
   background: transparent;
   border: none;
-  /* Keep stats + buttons pinned to the top of the action column. */
   justify-content: flex-start;
+  position: relative;
+  z-index: 2;
 }
 
 /* Equity + pot odds only — to call is on the Call button. */
 .felt-z3 .felt-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.25rem;
-  padding: 0.1rem 0.15rem;
+  gap: 0.1rem;
+  padding: 0;
 }
 
 .felt-z3 .felt-stats > div {
@@ -3910,13 +3927,18 @@ select {
 
 .felt-z3 .felt-buttons {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.25rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.28rem;
+}
+
+.felt-z3 .felt-buttons .allin {
+  grid-column: 1 / -1;
 }
 
 .felt-z3 .felt-buttons button {
   min-width: 0;
-  padding: 0.45rem 0.15rem;
+  min-height: 2.35rem;
+  padding: 0.3rem 0.15rem;
   font-size: 0.72rem;
   border-radius: 0.55rem;
 }
@@ -5235,12 +5257,20 @@ select {
 }
 
 /* Bet amount picker — vertical inverted-pyramid rail + side toggle */
+.confirm-modal-root.zone-bet-modal,
 .zone-bet-modal {
   touch-action: manipulation;
+  /* Bottom sheet: thumb reach on phone; other confirms stay centered. */
+  place-items: end center;
+  align-content: end;
+  padding: 0.5rem max(0.75rem, env(safe-area-inset-right))
+    max(0.65rem, env(safe-area-inset-bottom))
+    max(0.75rem, env(safe-area-inset-left));
 }
 
 .bet-modal-panel {
   width: min(26rem, 100%);
+  border-radius: 0.9rem 0.9rem 0.75rem 0.75rem;
 }
 
 .bet-modal-head {
@@ -5367,12 +5397,18 @@ select {
   /* Inverted pyramid: peak at top (all-in), wide delta at bottom (min). */
   clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
   background:
-    linear-gradient(180deg, rgba(255, 150, 60, 0.18) 0%, rgba(0, 0, 0, 0.35) 42%, rgba(0, 0, 0, 0.45) 100%),
-    rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-    0 8px 18px rgba(0, 0, 0, 0.35);
+    linear-gradient(180deg, rgba(255, 150, 60, 0.22) 0%, rgba(0, 0, 0, 0.28) 42%, rgba(0, 0, 0, 0.4) 100%),
+    rgba(15, 23, 42, 0.95);
+  /*
+   * clip-path eats normal borders — stacked drop-shadow draws a white
+   * silhouette that stays visible on every felt cloth.
+   */
+  filter:
+    drop-shadow(0 0 0.5px #ffffff)
+    drop-shadow(0 0 0.5px #ffffff)
+    drop-shadow(0 0 1px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.7));
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
 }
 
 .bet-modal-pyramid-fill {
@@ -5416,9 +5452,12 @@ select {
 }
 
 .bet-modal-pyramid:focus-visible .bet-modal-pyramid-shell {
-  box-shadow:
-    0 0 0 2px rgba(74, 222, 128, 0.65),
-    0 8px 18px rgba(0, 0, 0, 0.35);
+  filter:
+    drop-shadow(0 0 0.5px #ffffff)
+    drop-shadow(0 0 0.5px #ffffff)
+    drop-shadow(0 0 1px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 0 2px rgba(74, 222, 128, 0.9))
+    drop-shadow(0 0 6px rgba(74, 222, 128, 0.55));
 }
 
 .bet-modal-panel.is-allin {
@@ -5685,58 +5724,41 @@ select {
   .felt-action-float { animation: none; }
 }
 
-/* I — dealer puck by my avatar; short phones lay the hero zone out wide. */
+/* I — dealer puck by my avatar. */
 .felt-hero-id .felt-dealer-me {
   width: 1.15rem;
   height: 1.15rem;
   line-height: 1.15rem;
   font-size: 0.6rem;
 }
-@media (max-height: 700px) {
+
+/*
+ * Tall viewports (e.g. Safari with more chrome room): keep the same
+ * cards-left / actions-right hero layout, give Z2 more height, and open
+ * margins slightly so the extra space doesn't stack the action bar under cards.
+ */
+@media (min-height: 701px) {
+  .felt {
+    grid-template-rows: minmax(0, 2fr) minmax(0, 5fr) minmax(0, 3fr);
+    gap: 0.45rem;
+    padding: 0.5rem 0.55rem 0.6rem;
+  }
+
   .felt-z3-body {
-    flex-direction: row;
-    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .felt-z3 .felt-hole {
+    padding-top: 0.65rem;
+  }
+
+  .felt-z3 .felt-buttons {
     gap: 0.35rem;
   }
-  .felt-z3-body .felt-hole {
-    flex: 1 1 56%;
-    min-width: 0;
-    /* Stretch the card stage; cards stay slightly lower than the live bet. */
-    align-self: stretch;
-    align-items: flex-start;
-    padding-top: 0.55rem;
-  }
-  /*
-   * Climb into the empty right half of the hero-seat row so Equity / Pot odds
-   * sit high (level with the live-bet slot), separate from the lowered hole cards.
-   * Offset stays stable because the bet slot always reserves height.
-   */
-  .felt-z3-body .felt-actionbar {
-    flex: 0 0 44%;
-    justify-content: flex-start;
-    gap: 0.2rem;
-    padding-top: 0;
-    margin-top: -2.65rem;
-    position: relative;
-    z-index: 2;
-  }
-  .felt-z3-body .felt-stats {
-    padding: 0;
-    gap: 0.1rem;
-  }
-  .felt-z3-body .felt-buttons {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.28rem;
-  }
-  .felt-z3-body .felt-buttons button {
-    min-height: 2.35rem;
-    padding: 0.3rem 0.15rem;
-    font-size: 0.72rem;
-  }
-  .felt-z3-body .felt-buttons .allin {
-    grid-column: 1 / -1;
-  }
-  .felt-hole-handname {
+
+  .felt-z3 .felt-buttons button {
+    min-height: 2.5rem;
+    padding: 0.35rem 0.2rem;
     font-size: 0.74rem;
   }
 }
