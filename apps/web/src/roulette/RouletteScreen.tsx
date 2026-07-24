@@ -67,7 +67,8 @@ export function RouletteScreen({
         */}
         <div className="rlt-wheel-slot">
           <RouletteWheel spin={rlt.spin} winningIndex={rlt.state?.winningIndex ?? null} />
-          {rlt.result && !betting ? (
+          {/* Only during PAYOUT — never while SPINNING (old toast was reappearing). */}
+          {rlt.result && phase === 'PAYOUT' ? (
             <div
               key={rlt.result.key}
               className={`rlt-outcome${

@@ -68,6 +68,8 @@ export function useRoulette(user: { displayName: string; avatar?: string }): Rou
         switch (event.type) {
           case 'state':
             setState(event.state);
+            // New betting round: drop any leftover outcome toast.
+            if (event.state.phase === 'BETTING') setResult(null);
             break;
           case 'you':
             setBalance(event.balance);
@@ -76,6 +78,8 @@ export function useRoulette(user: { displayName: string; avatar?: string }): Rou
           case 'spin':
             // Capture stake now — payout phase clears the board before result paints.
             stakedAtSpinRef.current = totalStaked(betsRef.current);
+            // Drop the previous round's toast so it never reappears over "Girando…".
+            setResult(null);
             setSpin({ roundId: event.roundId, winningIndex: event.winningIndex, key: ++seqRef.current });
             break;
           case 'result':
