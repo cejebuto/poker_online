@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PublicRoomState, RoomSummary, WsServerEvent } from '@poker/shared';
 import { connectWs, type ConnectionStatus, type WsHandle } from './net/wsClient';
 import { clearSession, loadSession, saveSession } from './net/session';
+import { loadUserIdentity, saveUserIdentity } from './net/userIdentity';
 import { newClientActionId } from './net/id';
 import { UserGate } from './features/UserGate';
 import { Home } from './features/Home';
@@ -31,10 +32,16 @@ function joinRoomIdFromPath(): string | undefined {
   return m?.[1];
 }
 
+function initialScreen(hasUser: boolean): Screen {
+  if (!hasUser) return 'user';
+  return joinRoomIdFromPath() ? 'join' : 'home';
+}
+
 export function App() {
+  const prefill = useMemo(() => joinRoomIdFromPath(), []);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
-  const [screen, setScreen] = useState<Screen>('user');
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => loadUserIdentity());
+  const [screen, setScreen] = useState<Screen>(() => initialScreen(Boolean(loadUserIdentity())));
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [roomState, setRoomState] = useState<PublicRoomState | null>(null);
@@ -52,17 +59,20 @@ export function App() {
   const [activeUsers, setActiveUsers] = useState<number | null>(null);
   const actionSeqRef = useRef(0);
   const wsRef = useRef<WsHandle | null>(null);
-  const userRef = useRef<User | null>(null);
+  const userRef = useRef<User | null>(user);
   const resumeAttempted = useRef(false);
   /** Prevents double auto-start for the same completed hand. */
   const autoNextTokenRef = useRef<string | null>(null);
   /** One-shot guard for invite-link / public-room auto-join. */
   const publicJoinAttemptedRef = useRef<string | null>(null);
-  const prefill = useMemo(() => joinRoomIdFromPath(), []);
 
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  const announcePresence = useCallback((u: User) => {
+    wsRef.current?.send({ type: 'presence:hello', displayName: u.displayName });
+  }, []);
 
   const openThemes = (from: Screen) => {
     setThemesReturn(from);
@@ -236,8 +246,10 @@ export function App() {
         }
         handle.send({ type: 'rooms:list' });
         // Re-register presence after reconnect (count is per live connection).
-        const u = userRef.current;
+        // Prefer in-memory user; fall back to persisted identity.
+        const u = userRef.current ?? loadUserIdentity();
         if (u) {
+          userRef.current = u;
           handle.send({ type: 'presence:hello', displayName: u.displayName });
         }
       },
@@ -326,16 +338,19 @@ export function App() {
     roomState?.hostPlayerId,
   ]);
 
-  if (!user && screen === 'user') {
+  // Identity required for the rest of the app (also recovers resume races that
+  // jump to lobby before a pseudonym was stored).
+  if (!user) {
     return (
       <main className="app app-gate">
         <UserGate
           status={status}
           activeUsers={activeUsers}
           onReady={(u) => {
+            saveUserIdentity(u);
             setUser(u);
             userRef.current = u;
-            wsRef.current?.send({ type: 'presence:hello', displayName: u.displayName });
+            announcePresence(u);
             setScreen(prefill ? 'join' : 'home');
           }}
         />

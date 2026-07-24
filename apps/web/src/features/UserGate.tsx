@@ -4,12 +4,6 @@ import { ActiveUsersBadge } from './ActiveUsersBadge';
 import { DisclaimerModal } from './DisclaimerModal';
 import { SEAT_CHIPS, SeatChip, seatChipByToken } from './SeatChip';
 
-const CONN_LABEL: Record<ConnectionStatus, string> = {
-  connecting: 'Conectando',
-  connected: 'Conectado',
-  disconnected: 'Desconectado',
-};
-
 export function UserGate({
   status,
   activeUsers,
@@ -51,14 +45,8 @@ export function UserGate({
   return (
     <section className="gate" aria-labelledby="gate-title">
       <header className="gate-top">
-        <div className={`gate-conn gate-conn--${status}`} role="status">
-          <span className={`dot ${status}`} aria-hidden />
-          {CONN_LABEL[status]}
-        </div>
-        <div className="gate-top-right">
-          <ActiveUsersBadge count={activeUsers ?? null} />
-          <p className="gate-brand">MESA · TEXAS HOLD&apos;EM</p>
-        </div>
+        <ActiveUsersBadge status={status} count={activeUsers ?? null} />
+        <p className="gate-brand">MESA · TEXAS HOLD&apos;EM</p>
       </header>
 
       <form className="gate-card" onSubmit={onSubmit}>

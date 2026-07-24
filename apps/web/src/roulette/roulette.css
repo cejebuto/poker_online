@@ -30,15 +30,21 @@
 
 /* Wheel + chrome stay visible; never leave the viewport. */
 .rlt-stage {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   min-height: 0;
   z-index: 2;
+  overflow: visible; /* outcome toast may bleed above the wheel */
   background: radial-gradient(circle at 50% -5%, #123a2a 0%, #08160f 70%, #050d09 100%);
   padding-bottom: 0.2rem;
   border-bottom: 1px solid rgba(202, 169, 75, 0.18);
+}
+.rlt-stage .rlt-top {
+  position: relative;
+  z-index: 4; /* keep header above the floating toast */
 }
 
 /* Bet felt gets the leftover height (+5pp vs previous wheel-heavy layout). */
@@ -105,6 +111,14 @@
   font-variant-numeric: tabular-nums;
   color: var(--rlt-gold);
   font-size: 1rem;
+}
+
+/* Wheel box keeps a fixed footprint; outcome toasts overlay on top of it. */
+.rlt-wheel-slot {
+  position: relative;
+  flex-shrink: 0;
+  overflow: visible;
+  z-index: 3;
 }
 
 /* —— 3D wheel (≈ −5% vs prior stage height so bets gain room) —— */
@@ -207,19 +221,84 @@
   color: #fff;
 }
 
-/* —— Result banner —— */
-.rlt-result {
+/*
+ * Outcome toast — absolute over the wheel so the bet layout never jumps.
+ * Sits high on the bowl (and can bleed above it via overflow:visible).
+ */
+.rlt-outcome {
+  position: absolute;
+  left: 50%;
+  top: 0.15rem;
+  transform: translate(-50%, -18%);
+  z-index: 12;
+  pointer-events: none;
+  min-width: min(88%, 16rem);
+  max-width: 92%;
+  padding: 0.45rem 0.85rem 0.5rem;
+  border-radius: 0.75rem;
   text-align: center;
-  font-size: 0.9rem;
-  padding: 0.4rem 0.6rem;
-  border-radius: 0.6rem;
-  background: var(--rlt-panel);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(4, 14, 10, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(6px);
+  animation: rlt-outcome-in 0.28s ease-out both;
 }
-.rlt-result.is-win {
-  border-color: var(--rlt-gold);
+.rlt-outcome.is-win {
+  border-color: rgba(202, 169, 75, 0.85);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 0 18px rgba(202, 169, 75, 0.35);
+}
+.rlt-outcome.is-lose {
+  border-color: rgba(248, 113, 113, 0.55);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 0 14px rgba(220, 80, 80, 0.28);
+}
+.rlt-outcome-line {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #eaf5ee;
+  line-height: 1.25;
+}
+.rlt-outcome-line strong {
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+.rlt-outcome-sub {
+  margin-top: 0.18rem;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+.rlt-outcome.is-win .rlt-outcome-sub {
   color: #ffe9a8;
-  box-shadow: 0 0 0 1px rgba(202, 169, 75, 0.4);
+  text-shadow: 0 0 12px rgba(202, 169, 75, 0.45);
+}
+.rlt-outcome.is-lose .rlt-outcome-sub {
+  color: #fecaca;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.35);
+}
+
+@keyframes rlt-outcome-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8%) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -18%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rlt-outcome {
+    animation: none;
+  }
 }
 
 /* —— Chip rail —— */

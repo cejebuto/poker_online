@@ -3,12 +3,6 @@ import type { ConnectionStatus } from '../net/wsClient';
 import { ActiveUsersBadge } from './ActiveUsersBadge';
 import { RoomBrowser } from './RoomBrowser';
 
-const CONN_LABEL: Record<ConnectionStatus, string> = {
-  connecting: 'Conectando',
-  connected: 'Conectado',
-  disconnected: 'Desconectado',
-};
-
 export function Home({
   status,
   displayName,
@@ -42,14 +36,8 @@ export function Home({
   return (
     <div className="home">
       <header className="home-top">
-        <div className={`home-conn home-conn--${status}`} role="status">
-          <span className={`dot ${status}`} aria-hidden />
-          {CONN_LABEL[status]}
-        </div>
-        <div className="home-top-right">
-          <ActiveUsersBadge count={activeUsers ?? null} />
-          <p className="home-brand">TEXAS HOLD&apos;EM · NO-LIMIT</p>
-        </div>
+        <ActiveUsersBadge status={status} count={activeUsers ?? null} />
+        <p className="home-brand">TEXAS HOLD&apos;EM</p>
       </header>
 
       <section className="home-card home-hero" aria-labelledby="home-title">

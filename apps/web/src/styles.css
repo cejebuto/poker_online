@@ -108,7 +108,18 @@ body {
   margin-bottom: 0.65rem;
 }
 
-.gate-conn {
+.gate-brand {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--gate-gold);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Single status pill: "N en línea" | Conectando | Desconectado */
+.active-users {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -118,48 +129,37 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.78rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: #d7e4d7;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.gate-conn--disconnected {
+.active-users--disconnected {
   color: #fecaca;
 }
 
-.gate-top-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
-.gate-brand {
-  margin: 0;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: var(--gate-gold);
-  text-align: right;
-}
-
-.active-users {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.32rem;
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: rgba(215, 228, 215, 0.72);
-  white-space: nowrap;
+.active-users--connecting {
+  color: rgba(215, 228, 215, 0.85);
 }
 
 .active-users-dot {
-  width: 0.38rem;
-  height: 0.38rem;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 50%;
   background: #5dce7a;
   box-shadow: 0 0 0 2px rgba(93, 206, 122, 0.18);
   flex-shrink: 0;
+}
+
+.active-users-dot--connecting {
+  background: #e8c96a;
+  box-shadow: 0 0 0 2px rgba(232, 201, 106, 0.2);
+}
+
+.active-users-dot--disconnected {
+  background: #f87171;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.2);
 }
 
 .gate-card {
@@ -719,31 +719,6 @@ button.small {
   flex-shrink: 0;
 }
 
-.home-conn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.28rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(6, 22, 14, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #d7e4d7;
-}
-
-.home-conn--disconnected {
-  color: #fecaca;
-}
-
-.home-top-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
 .home-brand {
   margin: 0;
   font-size: 0.68rem;
@@ -751,6 +726,7 @@ button.small {
   letter-spacing: 0.12em;
   color: var(--home-gold);
   text-align: right;
+  white-space: nowrap;
 }
 
 .home-card {

@@ -2,9 +2,18 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import type { WebSocket } from 'ws';
 import type { WsServerEvent } from '@poker/shared';
-import { handleClientEvent, onDisconnect, sendPresence } from '../src/ws/handlers.js';
+import {
+  handleClientEvent,
+  markPresent,
+  onDisconnect,
+  sendPresence,
+} from '../src/ws/handlers.js';
 import { hub, type ClientSession } from '../src/ws/hub.js';
 import { _resetRateLimits } from '../src/domain/rateLimit.js';
+import { createRoom, joinRoom } from '../src/domain/roomService.js';
+import { roomRegistry } from '../src/domain/roomRegistry.js';
+import { _clearAllTimersForTests } from '../src/domain/timerService.js';
+import { signSession } from '../src/auth/jwt.js';
 
 type FakeSocket = {
   /** hub.send compares readyState against socket.OPEN (ws API). */
@@ -42,6 +51,7 @@ describe('global presence (registered users)', () => {
   afterEach(() => {
     hub._clearForTests();
     _resetRateLimits();
+    _clearAllTimersForTests();
   });
 
   it('starts at 0 and only counts connections that sent presence:hello', async () => {
@@ -52,7 +62,6 @@ describe('global presence (registered users)', () => {
 
     await handleClientEvent(a.session, { type: 'presence:hello', displayName: 'Ana' });
     assert.equal(hub.countPresent(), 1);
-    // Both sockets hear the new total.
     assert.equal(presenceUpdates(a.sock).at(-1), 1);
     assert.equal(presenceUpdates(b.sock).at(-1), 1);
 
@@ -100,5 +109,77 @@ describe('global presence (registered users)', () => {
     assert.equal(hub.countPresent(), 1);
     assert.equal(presenceUpdates(b.sock).length, 0);
     assert.equal(presenceUpdates(a.sock).at(-1), 1);
+  });
+
+  it('counts room:create without a prior hello', async () => {
+    const host = register('host-create');
+    await handleClientEvent(host.session, {
+      type: 'room:create',
+      password: 'Presxx',
+      user: { displayName: 'Hosty' },
+      config: { turnTimeoutMs: 0 },
+    });
+    assert.equal(hub.countPresent(), 1);
+    assert.equal(host.session.displayName, 'Hosty');
+  });
+
+  it('counts room:join without a prior hello; mesa does not count', async () => {
+    const host = register('host-join');
+    await handleClientEvent(host.session, {
+      type: 'room:create',
+      password: 'Presyy',
+      user: { displayName: 'Hosty' },
+      config: { turnTimeoutMs: 0 },
+    });
+    const roomId = host.session.roomId!;
+    const room = roomRegistry.get(roomId)!;
+
+    const guest = register('guest-join');
+    await handleClientEvent(guest.session, {
+      type: 'room:join',
+      roomId,
+      password: 'Presyy',
+      user: { displayName: 'Guest' },
+    });
+    assert.equal(hub.countPresent(), 2);
+
+    const mesa = register('mesa-join');
+    await handleClientEvent(mesa.session, {
+      type: 'mesa:attach',
+      roomId,
+      password: 'Presyy',
+    });
+    assert.equal(hub.countPresent(), 2, 'mesa device must not inflate presence');
+    assert.equal(mesa.session.displayName, undefined);
+    assert.equal(room.players.size >= 2, true);
+  });
+
+  it('counts session:resume from room occupant displayName', async () => {
+    const created = await createRoom({
+      password: 'Preszz',
+      user: { displayName: 'Resumer' },
+      connectionId: 'seed-conn',
+      config: { turnTimeoutMs: 0 },
+    });
+    // seed-conn is not a hub socket — only the resumed one should count.
+    const token = signSession({
+      playerId: created.player.playerId,
+      roomId: created.room.roomId,
+      role: 'host',
+      seat: created.player.seat,
+    });
+
+    const a = register('resume-a');
+    await handleClientEvent(a.session, { type: 'session:resume', token });
+    assert.equal(hub.countPresent(), 1);
+    assert.equal(a.session.displayName, 'Resumer');
+  });
+
+  it('markPresent rejects mesa label and short names', () => {
+    const a = register('mark');
+    assert.equal(markPresent(a.session, 'Mesa'), false);
+    assert.equal(markPresent(a.session, 'x'), false);
+    assert.equal(markPresent(a.session, 'OkName'), true);
+    assert.equal(hub.countPresent(), 1);
   });
 });

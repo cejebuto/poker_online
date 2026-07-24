@@ -40,6 +40,32 @@ export function sendPresence(connectionId: string): void {
   hub.send(connectionId, { type: 'presence:update', count: hub.countPresent() });
 }
 
+/**
+ * Mark a human connection as a registered app user (pseudonym chosen).
+ * Broadcasts only when the global count actually changes.
+ * Returns false if the name is unusable or the role is mesa.
+ */
+export function markPresent(
+  session: ClientSession,
+  rawName: string | undefined | null,
+  opts?: { allowMesa?: boolean },
+): boolean {
+  if (session.role === 'mesa' && !opts?.allowMesa) return false;
+  const raw = (rawName ?? '').trim();
+  if (raw.length < 2) return false;
+  // Mesa device uses a fixed label — never inflate the human counter.
+  if (raw.toLowerCase() === 'mesa') return false;
+  const name = sanitizeDisplayName(raw);
+  const wasPresent = Boolean(session.displayName);
+  session.displayName = name;
+  if (!wasPresent) {
+    broadcastPresence();
+  } else {
+    hub.send(session.connectionId, { type: 'presence:update', count: hub.countPresent() });
+  }
+  return true;
+}
+
 function snapshotFor(roomId: string, playerId: string | null): WsServerEvent | null {
   const room = roomRegistry.get(roomId);
   if (!room) return null;
@@ -97,16 +123,9 @@ export async function handleClientEvent(
           });
           return;
         }
-        const raw = (event.displayName ?? '').trim();
-        if (raw.length < 2) {
+        if (!markPresent(session, event.displayName)) {
           hub.send(session.connectionId, error('INVALID_USER', 'displayName required'));
-          return;
         }
-        const wasPresent = Boolean(session.displayName);
-        session.displayName = sanitizeDisplayName(raw);
-        // Re-hello only renames; count changes when a new registration appears.
-        if (!wasPresent) broadcastPresence();
-        else hub.send(session.connectionId, { type: 'presence:update', count: hub.countPresent() });
         return;
       }
 
@@ -131,6 +150,11 @@ export async function handleClientEvent(
         session.playerId = claims.playerId;
         session.roomId = claims.roomId;
         session.role = claims.role;
+        // Room occupants already chose a name — count them even without hello.
+        if (claims.role !== 'mesa') {
+          const occupant = room.players.get(claims.playerId);
+          markPresent(session, occupant?.displayName);
+        }
         hub.send(session.connectionId, {
           type: 'session:resumed',
           roomId: claims.roomId,
@@ -175,6 +199,7 @@ export async function handleClientEvent(
         session.playerId = result.player.playerId;
         session.roomId = result.room.roomId;
         session.role = 'host';
+        markPresent(session, result.player.displayName);
         hub.send(session.connectionId, {
           type: 'room:created',
           roomId: result.room.roomId,
@@ -221,6 +246,7 @@ export async function handleClientEvent(
           role: result.player.role,
         });
         if (!asMesa) {
+          markPresent(session, result.player.displayName);
           hub.broadcast(result.room.roomId, {
             type: 'player:joined',
             player: {

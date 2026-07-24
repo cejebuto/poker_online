@@ -61,7 +61,34 @@ export function RouletteScreen({
           </div>
         </header>
 
-        <RouletteWheel spin={rlt.spin} winningIndex={rlt.state?.winningIndex ?? null} />
+        {/*
+          Outcome floats over the wheel (absolute) so "Salió / Ganaste / Perdiste"
+          never reflow the stage or shove the bet felt.
+        */}
+        <div className="rlt-wheel-slot">
+          <RouletteWheel spin={rlt.spin} winningIndex={rlt.state?.winningIndex ?? null} />
+          {rlt.result && !betting ? (
+            <div
+              key={rlt.result.key}
+              className={`rlt-outcome${
+                rlt.result.payout > 0 ? ' is-win' : rlt.result.staked > 0 ? ' is-lose' : ''
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              <p className="rlt-outcome-line">
+                Salió <strong>{pocketByIndex(rlt.result.winningIndex).label}</strong>
+              </p>
+              {rlt.result.payout > 0 ? (
+                <p className="rlt-outcome-line rlt-outcome-sub">
+                  ¡Ganaste {formatChips(rlt.result.payout)}!
+                </p>
+              ) : rlt.result.staked > 0 ? (
+                <p className="rlt-outcome-line rlt-outcome-sub">Perdiste</p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
         {rlt.state?.history?.length ? (
           <div className="rlt-history" aria-label="Últimos resultados">
@@ -73,13 +100,6 @@ export function RouletteScreen({
                 </span>
               );
             })}
-          </div>
-        ) : null}
-
-        {rlt.result && !betting ? (
-          <div className={`rlt-result${rlt.result.payout > 0 ? ' is-win' : ''}`} role="status">
-            Salió <strong>{pocketByIndex(rlt.result.winningIndex).label}</strong>
-            {rlt.result.payout > 0 ? ` · ganaste ${formatChips(rlt.result.payout)}` : ''}
           </div>
         ) : null}
       </div>

@@ -8,7 +8,13 @@ import {
 import { rouletteId } from './rouletteIdentity';
 
 export type SpinTrigger = { roundId: string; winningIndex: number; key: number };
-export type RouletteResult = { winningIndex: number; payout: number; key: number };
+export type RouletteResult = {
+  winningIndex: number;
+  payout: number;
+  /** Chips this player had on the felt when the wheel stopped (0 if they sat out). */
+  staked: number;
+  key: number;
+};
 
 export type RouletteView = {
   status: RouletteStatus;
@@ -23,6 +29,10 @@ export type RouletteView = {
   topUp: () => void;
 };
 
+function totalStaked(bets: MyBet[]): number {
+  return bets.reduce((sum, b) => sum + b.amount, 0);
+}
+
 /** Owns the roulette socket and the derived view state for one screen. */
 export function useRoulette(user: { displayName: string; avatar?: string }): RouletteView {
   const [status, setStatus] = useState<RouletteStatus>('connecting');
@@ -34,6 +44,10 @@ export function useRoulette(user: { displayName: string; avatar?: string }): Rou
   const [error, setError] = useState<string | null>(null);
   const handleRef = useRef<RouletteHandle | null>(null);
   const seqRef = useRef(0);
+  /** Frozen at spin so "Perdiste" still works after the server clears bets. */
+  const stakedAtSpinRef = useRef(0);
+  const betsRef = useRef<MyBet[]>([]);
+  betsRef.current = bets;
 
   // The identity is stable; the name/avatar ride along on join.
   const userRef = useRef(user);
@@ -60,10 +74,17 @@ export function useRoulette(user: { displayName: string; avatar?: string }): Rou
             setBets(event.bets);
             break;
           case 'spin':
+            // Capture stake now — payout phase clears the board before result paints.
+            stakedAtSpinRef.current = totalStaked(betsRef.current);
             setSpin({ roundId: event.roundId, winningIndex: event.winningIndex, key: ++seqRef.current });
             break;
           case 'result':
-            setResult({ winningIndex: event.winningIndex, payout: event.payout, key: ++seqRef.current });
+            setResult({
+              winningIndex: event.winningIndex,
+              payout: event.payout,
+              staked: stakedAtSpinRef.current,
+              key: ++seqRef.current,
+            });
             setBalance(event.balance);
             break;
           case 'error':
