@@ -353,6 +353,7 @@ export function FeltView({
       return;
     }
     if (action === 'check' || action === 'call') {
+      if (action === 'check') playChip('check');
       play('tick');
       onAction(action);
       return;
@@ -375,6 +376,7 @@ export function FeltView({
     }
     if (pending === 'all-in') {
       play('throw');
+      playChip('allin');
       setPending(null);
       onAction('all-in');
     }
