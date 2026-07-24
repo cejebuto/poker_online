@@ -10,8 +10,9 @@ import {
   saveEquityEnabled,
   useEquity,
 } from '../probability/useEquity';
-import { TurnTimer } from './TurnTimer';
+import { formatChips } from './feltStats';
 import { describeHandResult } from './handResult';
+import { TurnTimer } from './TurnTimer';
 
 export function PlayerView({
   state,
@@ -178,8 +179,12 @@ export function PlayerView({
               {hand?.currentToAct === p.seat ? ' ◀' : ''}
             </span>
             <IsoChipStack amount={p.stack} compact />
-            {p.betThisRound ? (
-              <span className="meta">bet {p.betThisRound}</span>
+            {p.status === 'ALL_IN' ? (
+              <span className="meta accent">
+                All-in{p.betThisRound ? ` ${formatChips(p.betThisRound)}` : ''}
+              </span>
+            ) : p.betThisRound ? (
+              <span className="meta">bet {formatChips(p.betThisRound)}</span>
             ) : null}
           </li>
         ))}

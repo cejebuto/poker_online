@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import type { RoomConfig } from '@poker/shared';
+import { formatChips, parseChipInput } from './feltStats';
 
 export type CreateRoomSubmit = {
   password: string;
@@ -8,11 +9,24 @@ export type CreateRoomSubmit = {
 
 const PASSWORD_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
+/** Stack: 1K … 10M, step 1K. */
+const STACK_MIN = 1_000;
+const STACK_MAX = 10_000_000;
+const STACK_STEP = 1_000;
+
+/** Blinds: SB 0.1K…2K, BB 0.2K…4K. */
+const SB_MIN = 100;
+const SB_MAX = 2_000;
+const SB_STEP = 100;
+const BB_MIN = 200;
+const BB_MAX = 4_000;
+const BB_STEP = 200;
+
 const BLIND_PRESETS = [
-  { sb: 5, bb: 10 },
-  { sb: 10, bb: 25 },
-  { sb: 25, bb: 50 },
-  { sb: 50, bb: 100 },
+  { sb: 100, bb: 200 },
+  { sb: 250, bb: 500 },
+  { sb: 500, bb: 1_000 },
+  { sb: 1_000, bb: 2_000 },
 ] as const;
 
 /** 6 random uppercase letters (matches room password format). */
@@ -28,6 +42,12 @@ function generateRoomPassword(): string {
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
+}
+
+/** Snap to a step while staying inside [min, max]. */
+function snap(n: number, min: number, max: number, step: number): number {
+  const clamped = clamp(n, min, max);
+  return Math.round(clamped / step) * step;
 }
 
 export function CreateRoom({
@@ -47,9 +67,10 @@ export function CreateRoom({
   const [name, setName] = useState('Noche de póker');
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [mode, setMode] = useState<'cash' | 'tournament'>('cash');
-  const [startingStack, setStartingStack] = useState(1000);
-  const [smallBlind, setSmallBlind] = useState(5);
-  const [bigBlind, setBigBlind] = useState(10);
+  // 10K default ≈ 50 BB with 0.1K/0.2K blinds.
+  const [startingStack, setStartingStack] = useState(10_000);
+  const [smallBlind, setSmallBlind] = useState(100);
+  const [bigBlind, setBigBlind] = useState(200);
   const [allowRebuy, setAllowRebuy] = useState(true);
   const [rebuyMax, setRebuyMax] = useState(3);
   const [turnSec, setTurnSec] = useState(30);
@@ -63,6 +84,16 @@ export function CreateRoom({
   const applyBlindPreset = (sb: number, bb: number) => {
     setSmallBlind(sb);
     setBigBlind(bb);
+  };
+
+  const setSb = (raw: number) => {
+    const sb = snap(raw, SB_MIN, SB_MAX, SB_STEP);
+    setSmallBlind(sb);
+    setBigBlind((bb) => (bb < sb * 2 ? snap(sb * 2, BB_MIN, BB_MAX, BB_STEP) : bb));
+  };
+
+  const setBb = (raw: number) => {
+    setBigBlind(snap(raw, Math.max(BB_MIN, smallBlind), BB_MAX, BB_STEP));
   };
 
   const submit = () => {
@@ -104,7 +135,8 @@ export function CreateRoom({
           <div className="create-summary-text">
             <span className="create-summary-label">RESUMEN</span>
             <span className="create-summary-value">
-              {maxPlayers}p · {smallBlind}/{bigBlind}
+              {maxPlayers}p · {formatChips(smallBlind)}/{formatChips(bigBlind)} ·{' '}
+              {formatChips(startingStack)}
             </span>
           </div>
         </div>
@@ -188,30 +220,29 @@ export function CreateRoom({
             onDec={() => setMaxPlayers((n) => clamp(n - 1, 2, 9))}
             onInc={() => setMaxPlayers((n) => clamp(n + 1, 2, 9))}
           />
-          <Stepper
+          <ChipStepper
             label="STACK INICIAL"
             value={startingStack}
-            display={String(startingStack)}
-            onDec={() => setStartingStack((n) => clamp(n - 100, 100, 100_000))}
-            onInc={() => setStartingStack((n) => clamp(n + 100, 100, 100_000))}
+            min={STACK_MIN}
+            max={STACK_MAX}
+            step={STACK_STEP}
+            onChange={(n) => setStartingStack(snap(n, STACK_MIN, STACK_MAX, STACK_STEP))}
           />
-          <Stepper
+          <ChipStepper
             label="SMALL BLIND"
             value={smallBlind}
-            display={String(smallBlind)}
-            onDec={() => setSmallBlind((n) => clamp(n - 1, 1, bigBlind))}
-            onInc={() => {
-              const next = clamp(smallBlind + 1, 1, 10_000);
-              setSmallBlind(next);
-              if (next > bigBlind) setBigBlind(next);
-            }}
+            min={SB_MIN}
+            max={SB_MAX}
+            step={SB_STEP}
+            onChange={setSb}
           />
-          <Stepper
+          <ChipStepper
             label="BIG BLIND"
             value={bigBlind}
-            display={String(bigBlind)}
-            onDec={() => setBigBlind((n) => clamp(n - 1, smallBlind, 20_000))}
-            onInc={() => setBigBlind((n) => clamp(n + 1, smallBlind, 20_000))}
+            min={Math.max(BB_MIN, smallBlind)}
+            max={BB_MAX}
+            step={BB_STEP}
+            onChange={setBb}
           />
           <Stepper
             label="TURNO"
@@ -242,7 +273,7 @@ export function CreateRoom({
                   aria-pressed={active}
                   onClick={() => applyBlindPreset(sb, bb)}
                 >
-                  {sb}/{bb}
+                  {formatChips(sb)}/{formatChips(bb)}
                 </button>
               );
             })}
@@ -274,11 +305,7 @@ export function CreateRoom({
                   +
                 </button>
               </div>
-              <Toggle
-                checked={allowRebuy}
-                onChange={setAllowRebuy}
-                label="Permitir recompra"
-              />
+              <Toggle checked={allowRebuy} onChange={setAllowRebuy} label="Permitir recompra" />
             </div>
           </div>
         ) : (
@@ -330,6 +357,80 @@ function Stepper({
         </button>
         <span className="create-step-val">{display}</span>
         <button type="button" className="create-step-btn" aria-label={`${label} más`} onClick={onInc}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Chip amount stepper: +/− by step, display in K/M, manual entry in kilos
+ * ("20" → 20K, "2M" → 2_000_000).
+ */
+function ChipStepper({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? formatChips(value);
+
+  const commit = (raw: string) => {
+    const parsed = parseChipInput(raw);
+    setDraft(null);
+    if (parsed === null) return;
+    onChange(snap(parsed, min, max, step));
+  };
+
+  return (
+    <div className="create-stepper" data-value={value}>
+      <span className="create-label">{label}</span>
+      <div className="create-step-body">
+        <button
+          type="button"
+          className="create-step-btn"
+          aria-label={`${label} menos`}
+          onClick={() => onChange(snap(value - step, min, max, step))}
+        >
+          −
+        </button>
+        <input
+          className="create-step-val create-step-input"
+          value={shown}
+          aria-label={label}
+          inputMode="decimal"
+          autoComplete="off"
+          spellCheck={false}
+          onFocus={() => setDraft(formatChips(value))}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => commit(draft ?? '')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur();
+            }
+            if (e.key === 'Escape') {
+              setDraft(null);
+              e.currentTarget.blur();
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="create-step-btn"
+          aria-label={`${label} más`}
+          onClick={() => onChange(snap(value + step, min, max, step))}
+        >
           +
         </button>
       </div>

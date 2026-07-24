@@ -41,8 +41,9 @@ import {
 } from './showdown';
 import { CountdownRing } from './CountdownRing';
 import { WinCelebration } from './WinCelebration';
+import { AllInBadge } from './AllInBadge';
 import { AllInMark } from './AllInMark';
-import { actionLabel, collectedPot, formatChips, handCounts, potOdds, streetLabel } from './feltStats';
+import { collectedPot, describeAction, formatChips, handCounts, potOdds, streetLabel } from './feltStats';
 
 type ActionName = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
 
@@ -275,10 +276,11 @@ export function FeltView({
   const [actionFloats, setActionFloats] = useState<Map<number, ActionFloat>>(new Map());
   useEffect(() => {
     if (!lastActionEvent) return;
-    const { seat, action, id } = lastActionEvent;
+    const { seat, action, amount, id } = lastActionEvent;
     setActionFloats((prev) => {
       const next = new Map(prev);
-      next.set(seat, { label: actionLabel(action), key: id });
+      // All-in (and bet/raise/call) include the amount so the shove is readable.
+      next.set(seat, { label: describeAction(action, amount), key: id });
       return next;
     });
     const t = window.setTimeout(() => {
@@ -586,15 +588,20 @@ export function FeltView({
             ) : null}
           </div>
 
-          {/* Stack pill with live bet chips stacked on top of it. */}
+          {/* Stack pill; live bet or a loud ALL-IN badge sits above it. */}
           <div className="felt-hero-stack">
-            {!myShowdown?.cards.length && me?.status !== 'ALL_IN' && myBet > 0 ? (
+            {!myShowdown?.cards.length && me?.status === 'ALL_IN' ? (
+              <AllInBadge amount={myBet} size="md" className="felt-hero-bet" />
+            ) : !myShowdown?.cards.length && myBet > 0 ? (
               <span className="felt-seat-bet-chip felt-hero-bet" aria-label={`Apuesta ${formatChips(myBet)}`}>
                 <ChipStackMini amount={myBet} size="xs" maxColumns={2} maxPerColumn={3} />
                 <span className="felt-seat-bet-amt">{formatChips(myBet)}</span>
               </span>
             ) : null}
-            <div ref={stackTargetRef} className="felt-stack-target zone-felt-stack">
+            <div
+              ref={stackTargetRef}
+              className={`felt-stack-target zone-felt-stack${me?.status === 'ALL_IN' ? ' is-allin' : ''}`}
+            >
               <ChipStackMini amount={stackShown} size="xs" className="felt-my-chips" />
               <motion.strong
                 className="accent"
@@ -609,16 +616,12 @@ export function FeltView({
           </div>
 
           {/* At hand end my cards read here, small, right beside my stack — the
-              same size my opponents show. Otherwise all-in mark when shoved. */}
+              same size my opponents show. */}
           {myShowdown?.cards.length ? (
             <span className="felt-seat-hole felt-hero-hole" aria-label="Tus cartas">
               {myShowdown.cards.map((card, i) => (
                 <PlayingCard key={i} card={card} size="sm" halfScale={1.05} animate="reveal" />
               ))}
-            </span>
-          ) : me?.status === 'ALL_IN' ? (
-            <span className="felt-seat-mark felt-seat-mark--allin" title="All-in">
-              <AllInMark size={18} />
             </span>
           ) : (
             <span className="felt-hero-mark-spacer" aria-hidden />
@@ -661,24 +664,29 @@ export function FeltView({
                   }
                 }}
               >
-                <div className="cards">
-                  {(hand?.yourCards ?? [null, null]).map((card, i) => (
-                    <PlayingCard
-                      key={`${holeFlips}-${i}`}
-                      card={card}
-                      faceDown={!card || holeFaceDown}
-                      size="lg"
-                      halfScale={1.35}
-                      animate={holeFlips > 0 ? 'flip' : card ? 'deal-deck' : 'none'}
-                      animateDelayMs={holeFlips > 0 ? 0 : i * HOLE_DEAL_STAGGER_MS}
-                    />
-                  ))}
+                {/*
+                  Cluster scales as one unit so the hand name stays glued just
+                  under the cards (absolute-to-bottom was dumping it on the floor).
+                */}
+                <div className="felt-hole-cluster">
+                  <div className="cards">
+                    {(hand?.yourCards ?? [null, null]).map((card, i) => (
+                      <PlayingCard
+                        key={`${holeFlips}-${i}`}
+                        card={card}
+                        faceDown={!card || holeFaceDown}
+                        size="lg"
+                        halfScale={1.35}
+                        animate={holeFlips > 0 ? 'flip' : card ? 'deal-deck' : 'none'}
+                        animateDelayMs={holeFlips > 0 ? 0 : i * HOLE_DEAL_STAGGER_MS}
+                      />
+                    ))}
+                  </div>
+                  {!holeFaceDown && myHandName ? (
+                    <p className="felt-hole-handname accent">{myHandName}</p>
+                  ) : null}
                 </div>
               </div>
-              {/* My current hand reads right under my cards. */}
-              {!holeFaceDown && myHandName ? (
-                <p className="felt-hole-handname accent">{myHandName}</p>
-              ) : null}
             </div>
 
             <div className="felt-actionbar">
@@ -797,7 +805,7 @@ export function FeltView({
       {betFlights.layer}
 
       <WinCelebration
-        open={partyOpen}
+        open={partyOpen && myPayout > 0}
         payout={myPayout}
         bigBlind={bigBlind}
         handId={hand?.handId}
@@ -928,12 +936,10 @@ function FeltSeatPill({
       </span>
     ) : null;
 
-  // Beside the name: the live bet as a chip, or the all-in triangle. Showdown
-  // seats show their result instead (below).
+  // Beside the name: live bet chips, or a loud ALL-IN + amount badge.
+  // Showdown seats show their result instead (below).
   const marks = showdown ? null : player.status === 'ALL_IN' ? (
-    <span className="felt-seat-mark felt-seat-mark--allin" title="All-in">
-      <AllInMark size={16} />
-    </span>
+    <AllInBadge amount={player.betThisRound ?? 0} size="sm" />
   ) : player.betThisRound ? (
     <span className="felt-seat-bet-chip" aria-label={`Apuesta ${formatChips(player.betThisRound)}`}>
       <ChipStackMini amount={player.betThisRound} size="xs" maxColumns={2} maxPerColumn={3} />
@@ -982,11 +988,15 @@ function FeltSeatPill({
       </>
     );
 
+  const allIn = player.status === 'ALL_IN';
+
   return (
     <li
       className={`felt-seat-pill felt-seat-pill--${side}${acting ? ' acting' : ''}${
         folded ? ' folded' : ''
-      }${showdown?.isWinner ? ' is-winner' : ''}${revealing ? ' revealing' : ''}`}
+      }${allIn ? ' is-allin' : ''}${showdown?.isWinner ? ' is-winner' : ''}${
+        revealing ? ' revealing' : ''
+      }`}
     >
       {actionFloat ? (
         <span key={actionFloat.key} className="felt-action-float" role="status">

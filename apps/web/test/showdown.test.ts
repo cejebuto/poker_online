@@ -164,13 +164,18 @@ describe('describeWinnerHeadline', () => {
     });
     assert.equal(
       describeWinnerHeadline(rows, result, PLAYERS),
-      'Ganó 🐺 Ana · $1.200 · Color al A',
+      'Ganó 🐺 Ana · 1.2K · Color al A',
     );
   });
 
   it('omits the hand when everyone folded', () => {
     const result = { winners: [1], payouts: { 1: 300 } };
-    assert.equal(describeWinnerHeadline([], result, PLAYERS), 'Ganó Beto · $300 · sin showdown');
+    assert.equal(describeWinnerHeadline([], result, PLAYERS), 'Ganó Beto · 0.3K · sin showdown');
+  });
+
+  it('omits a zero payout amount from the headline', () => {
+    const result = { winners: [1], payouts: { 1: 0 } };
+    assert.equal(describeWinnerHeadline([], result, PLAYERS), 'Ganó Beto · sin showdown');
   });
 
   it('lists every winner of a split pot', () => {
@@ -183,8 +188,8 @@ describe('describeWinnerHeadline', () => {
     });
     const text = describeWinnerHeadline(rows, result, PLAYERS);
     assert.match(text, /^Bote dividido: /);
-    assert.match(text, /🐺 Ana \$600/);
-    assert.match(text, /Beto \$600/);
+    assert.match(text, /🐺 Ana 0\.6K/);
+    assert.match(text, /Beto 0\.6K/);
   });
 
   it('is empty when there is nothing to announce', () => {

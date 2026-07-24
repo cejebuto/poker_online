@@ -144,8 +144,10 @@ export function TableView({
                   </span>
                 ) : null}
               </div>
-              <div className="mesa-seat-bet">
-                <span className="mesa-seat-bet-label">Apuesta</span>
+              <div className={`mesa-seat-bet${p.status === 'ALL_IN' ? ' is-allin' : ''}`}>
+                <span className="mesa-seat-bet-label">
+                  {p.status === 'ALL_IN' ? 'All-in' : 'Apuesta'}
+                </span>
                 <span className="mesa-seat-bet-amount">{formatChips(p.betThisRound ?? 0)}</span>
               </div>
             </div>

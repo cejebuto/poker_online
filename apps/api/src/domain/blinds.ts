@@ -1,17 +1,20 @@
 import type { BlindLevel, RoomConfig } from '@poker/shared';
 
-/** Default tournament structure: doubles roughly every 5 minutes. */
+/**
+ * Default tournament structure: doubles roughly every 5 minutes.
+ * Scaled to chip units where 0.1K/0.2K is the cash-game floor (×20 vs legacy 5/10).
+ */
 export const DEFAULT_BLIND_STRUCTURE: BlindLevel[] = [
-  { smallBlind: 5, bigBlind: 10, durationMs: 5 * 60_000 },
-  { smallBlind: 10, bigBlind: 20, durationMs: 5 * 60_000 },
-  { smallBlind: 15, bigBlind: 30, durationMs: 5 * 60_000 },
-  { smallBlind: 25, bigBlind: 50, durationMs: 5 * 60_000 },
-  { smallBlind: 50, bigBlind: 100, durationMs: 5 * 60_000 },
-  { smallBlind: 75, bigBlind: 150, durationMs: 5 * 60_000 },
   { smallBlind: 100, bigBlind: 200, durationMs: 5 * 60_000 },
   { smallBlind: 200, bigBlind: 400, durationMs: 5 * 60_000 },
   { smallBlind: 300, bigBlind: 600, durationMs: 5 * 60_000 },
-  { smallBlind: 500, bigBlind: 1000, durationMs: 5 * 60_000 },
+  { smallBlind: 500, bigBlind: 1_000, durationMs: 5 * 60_000 },
+  { smallBlind: 1_000, bigBlind: 2_000, durationMs: 5 * 60_000 },
+  { smallBlind: 1_500, bigBlind: 3_000, durationMs: 5 * 60_000 },
+  { smallBlind: 2_000, bigBlind: 4_000, durationMs: 5 * 60_000 },
+  { smallBlind: 4_000, bigBlind: 8_000, durationMs: 5 * 60_000 },
+  { smallBlind: 6_000, bigBlind: 12_000, durationMs: 5 * 60_000 },
+  { smallBlind: 10_000, bigBlind: 20_000, durationMs: 5 * 60_000 },
 ];
 
 export function resolveBlindStructure(config: RoomConfig): BlindLevel[] {

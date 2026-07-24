@@ -13,6 +13,7 @@ import {
   describeAction,
   formatChips,
   handCounts,
+  parseChipInput,
   potOdds,
   streetLabel,
 } from '../src/features/feltStats.js';
@@ -30,13 +31,53 @@ function player(seat: number, status?: PublicPlayer['status']): PublicPlayer {
 }
 
 describe('formatChips', () => {
-  it('groups thousands and prefixes the currency mark', () => {
-    assert.equal(formatChips(3250), '$3.250');
-    assert.equal(formatChips(120), '$120');
+  it('uses K/M without a currency mark', () => {
+    assert.equal(formatChips(3250), '3.25K');
+    assert.equal(formatChips(1200), '1.2K');
+    assert.equal(formatChips(500), '0.5K');
+    assert.equal(formatChips(12_500), '12.5K');
+  });
+
+  it('renders whole thousands without decimals', () => {
+    assert.equal(formatChips(1000), '1K');
+    assert.equal(formatChips(1_000_000), '1M');
+  });
+
+  it('uses M for millions with up to two decimals', () => {
+    assert.equal(formatChips(1_230_000), '1.23M');
+    assert.equal(formatChips(2_500_000), '2.5M');
   });
 
   it('renders zero rather than an empty string', () => {
-    assert.equal(formatChips(0), '$0');
+    assert.equal(formatChips(0), '0');
+  });
+
+  it('formats sub-thousand amounts as fractional K', () => {
+    assert.equal(formatChips(10), '0.01K');
+    assert.equal(formatChips(100), '0.1K');
+  });
+});
+
+describe('parseChipInput', () => {
+  it('treats a bare number as kilos', () => {
+    assert.equal(parseChipInput('20'), 20_000);
+    assert.equal(parseChipInput('500'), 500_000);
+    assert.equal(parseChipInput('1'), 1000);
+    assert.equal(parseChipInput('0.1'), 100);
+  });
+
+  it('accepts explicit K / M suffixes', () => {
+    assert.equal(parseChipInput('20k'), 20_000);
+    assert.equal(parseChipInput('20K'), 20_000);
+    assert.equal(parseChipInput('1.5K'), 1500);
+    assert.equal(parseChipInput('2M'), 2_000_000);
+    assert.equal(parseChipInput('1.23m'), 1_230_000);
+  });
+
+  it('returns null for empty or invalid input', () => {
+    assert.equal(parseChipInput(''), null);
+    assert.equal(parseChipInput('  '), null);
+    assert.equal(parseChipInput('abc'), null);
   });
 });
 
@@ -84,9 +125,9 @@ describe('handCounts', () => {
 
 describe('describeAction', () => {
   it('names the action with its amount', () => {
-    assert.equal(describeAction('bet', 120), 'Bet $120');
-    assert.equal(describeAction('raise', 400), 'Raise $400');
-    assert.equal(describeAction('call', 120), 'Call $120');
+    assert.equal(describeAction('bet', 120), 'Bet 0.12K');
+    assert.equal(describeAction('raise', 400), 'Raise 0.4K');
+    assert.equal(describeAction('call', 120), 'Call 0.12K');
   });
 
   it('omits the amount for actions that carry none', () => {
@@ -95,7 +136,7 @@ describe('describeAction', () => {
   });
 
   it('labels an all-in with the committed amount', () => {
-    assert.equal(describeAction('all-in', 980), 'All-in $980');
+    assert.equal(describeAction('all-in', 980), 'All-in 0.98K');
   });
 });
 

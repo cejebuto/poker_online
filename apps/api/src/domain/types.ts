@@ -53,9 +53,11 @@ export type InternalRoom = {
 export const DEFAULT_CONFIG: RoomConfig = {
   name: 'Poker Night',
   maxPlayers: 9,
-  smallBlind: 5,
-  bigBlind: 10,
-  startingStack: 1000,
+  /** Display as 0.1K / 0.2K — matches create-room mins. */
+  smallBlind: 100,
+  bigBlind: 200,
+  /** 10K ≈ 50 BB at default blinds. */
+  startingStack: 10_000,
   mode: 'cash',
   turnTimeoutMs: 30_000,
   timeBankMs: 60_000,
@@ -96,9 +98,22 @@ export function normalizeRoomConfig(partial?: Partial<RoomConfig>): RoomConfig {
     base.reconnectWindowMs = partial.reconnectWindowMs * 1000;
   }
   base.maxPlayers = Math.min(9, Math.max(2, Math.floor(base.maxPlayers || 9)));
-  base.startingStack = Math.max(1, Math.floor(base.startingStack || 1000));
-  base.smallBlind = Math.max(1, Math.floor(base.smallBlind || 5));
-  base.bigBlind = Math.max(base.smallBlind, Math.floor(base.bigBlind || 10));
+  // Stack cap 10M. Floor stays 1 so tests/engine edge cases still work;
+  // the create-room UI enforces the product min of 1K.
+  base.startingStack = Math.min(
+    10_000_000,
+    Math.max(1, Math.floor(base.startingStack || DEFAULT_CONFIG.startingStack)),
+  );
+  // Blinds: soft max matches create-room (2K/4K). No product min here —
+  // UI gates 0.1K/0.2K; tests may pass smaller values.
+  base.smallBlind = Math.min(
+    2_000,
+    Math.max(1, Math.floor(base.smallBlind || DEFAULT_CONFIG.smallBlind)),
+  );
+  base.bigBlind = Math.min(
+    4_000,
+    Math.max(base.smallBlind, Math.floor(base.bigBlind || DEFAULT_CONFIG.bigBlind)),
+  );
   base.rebuyMax = Math.max(0, Math.floor(base.rebuyMax ?? 3));
   if (base.mode === 'tournament') {
     base.allowRebuy = false;

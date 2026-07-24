@@ -113,7 +113,8 @@ describe('e2e multi-client game flow', () => {
       password: 'Retryx',
       user: { displayName: 'H' },
       connectionId: 'r1',
-      config: { turnTimeoutMs: 0, startingStack: 200 },
+      // Stack must cover default blinds (0.1K/0.2K) with room to act.
+      config: { turnTimeoutMs: 0, startingStack: 10_000, smallBlind: 100, bigBlind: 200 },
     });
     await joinRoom({
       roomId: host.room.roomId,

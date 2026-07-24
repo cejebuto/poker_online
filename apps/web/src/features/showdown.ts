@@ -178,15 +178,17 @@ export function describeWinnerHeadline(
     const seat = result.winners[0]!;
     const amount = result.payouts[seat] ?? 0;
     const hand = rows.find((r) => r.seat === seat)?.categoryLabel ?? 'sin showdown';
+    if (amount <= 0) return `Ganó ${seatLabel(seat, players)} · ${hand}`;
     return `Ganó ${seatLabel(seat, players)} · ${formatChips(amount)} · ${hand}`;
   }
 
   const parts = result.winners.map((seat) => {
-    const amount = formatChips(result.payouts[seat] ?? 0);
+    const amount = result.payouts[seat] ?? 0;
     const hand = rows.find((r) => r.seat === seat)?.categoryLabel;
-    return hand
-      ? `${seatLabel(seat, players)} ${amount} (${hand})`
-      : `${seatLabel(seat, players)} ${amount}`;
+    const name = seatLabel(seat, players);
+    if (amount <= 0) return hand ? `${name} (${hand})` : name;
+    const amt = formatChips(amount);
+    return hand ? `${name} ${amt} (${hand})` : `${name} ${amt}`;
   });
   return `Bote dividido: ${parts.join(' · ')}`;
 }

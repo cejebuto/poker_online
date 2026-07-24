@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { toDataURL } from 'qrcode';
 import type { PublicPlayer, PublicRoomState } from '@poker/shared';
+import { formatChips } from './feltStats';
 import { NextHandPrompt } from './NextHandPrompt';
 import { canPlayerRebuy } from './rebuy';
 import { SEAT_CHIPS, SeatChip, seatChipByToken } from './SeatChip';
@@ -49,9 +50,10 @@ export function Lobby({
           </p>
           <h1 className="lobby-title">{state.config.name}</h1>
           <p className="lobby-sub">
-            Ciegas {state.effectiveSmallBlind}/{state.effectiveBigBlind}
+            Ciegas {formatChips(state.effectiveSmallBlind)}/
+            {formatChips(state.effectiveBigBlind)}
             {state.config.doubleMinimum ? ' · mín. 2×BB' : ''}
-            {' · '}stack {state.config.startingStack}
+            {' · '}stack {formatChips(state.config.startingStack)}
             {state.config.mode === 'cash' && state.config.allowRebuy
               ? ` · rebuy ×${state.config.rebuyMax ?? 0}`
               : ''}
@@ -106,13 +108,15 @@ export function Lobby({
         {state.tournament ? (
           <section className="lobby-card lobby-tournament">
             <strong>
-              Nivel {state.tournament.levelIndex + 1}: {state.tournament.smallBlind}/
-              {state.tournament.bigBlind}
+              Nivel {state.tournament.levelIndex + 1}:{' '}
+              {formatChips(state.tournament.smallBlind)}/
+              {formatChips(state.tournament.bigBlind)}
             </strong>
             {state.tournament.nextBigBlind ? (
               <span className="lobby-meta">
                 {' '}
-                · siguiente {state.tournament.nextSmallBlind}/{state.tournament.nextBigBlind}
+                · siguiente {formatChips(state.tournament.nextSmallBlind ?? 0)}/
+                {formatChips(state.tournament.nextBigBlind)}
               </span>
             ) : null}
             {state.tournament.levelEndsAt ? (
@@ -338,7 +342,7 @@ function PlayerRow({
           {showReady && player.ready ? <span className="lobby-ready-pill">LISTO</span> : null}
         </div>
         <span className="lobby-player-meta">
-          Asiento {player.seat ?? '—'} · {player.stack.toLocaleString()} fichas
+          Asiento {player.seat ?? '—'} · {formatChips(player.stack)}
           {player.rebuyCount ? ` · rebuy ${player.rebuyCount}` : ''}
           {player.finishPlace ? ` · #${player.finishPlace}` : ''}
           {offline ? ' · offline' : ''}

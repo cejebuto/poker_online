@@ -1196,6 +1196,28 @@ button.small {
   color: #f7f3ea;
 }
 
+/* Editable chip amount (K/M) inside the create-room stepper. */
+.create-step-input {
+  box-sizing: border-box;
+  width: 4.6rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.15rem 0.1rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.create-step-input:focus {
+  outline: none;
+  border-color: rgba(212, 176, 106, 0.55);
+  background: rgba(0, 0, 0, 0.25);
+}
+
 .create-presets {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2678,6 +2700,26 @@ button.small {
   font-weight: 700;
 }
 
+.mesa-seat-bet.is-allin {
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 170, 70, 0.65);
+  border-left: 1px solid rgba(255, 170, 70, 0.65);
+  background: linear-gradient(180deg, #3a1608 0%, #1a0a06 100%);
+  box-shadow: 0 0 12px rgba(255, 120, 40, 0.35);
+}
+
+.mesa-seat-bet.is-allin .mesa-seat-bet-label {
+  color: #ffd089;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+}
+
+.mesa-seat-bet.is-allin .mesa-seat-bet-amount {
+  color: #fff8e7;
+  font-weight: 900;
+}
+
 /*
  * A portrait phone cannot hold an absolutely placed oval — the seats overlap the
  * cards and each other. Below 720px the ring collapses into ordinary flow.
@@ -3513,21 +3555,19 @@ select {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
+  /* Cards sit a bit lower so they track avatar + stack, not the live bet. */
   align-items: flex-start;
   justify-content: center;
   margin: 0;
-  padding: 0.1rem 0.15rem 0;
+  padding: 0.45rem 0.15rem 0;
 }
 
-/* The hand name reads under the cards, where the peek hint used to sit. */
+/* Hand name sits in the scaled cluster, directly under the pair. */
 .felt-hole-handname {
-  position: absolute;
-  left: 50%;
-  bottom: 0.05rem;
-  transform: translateX(-50%);
+  position: static;
   margin: 0;
-  max-width: 96%;
-  padding: 0.06rem 0.55rem;
+  max-width: 12rem;
+  padding: 0.12rem 0.6rem;
   border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 800;
@@ -3558,11 +3598,38 @@ select {
   height: 100%;
   container-type: size;
   display: flex;
-  /* Cards sit high so the action column can share the same top edge. */
   align-items: flex-start;
   justify-content: center;
-  padding-top: 0.1rem;
+  /* Nudge the pair down under the separated stack/identity row. */
+  padding-top: 0.2rem;
   cursor: pointer;
+}
+
+/* Cards + hand name scale together so the label stays just under the pair. */
+.felt-z3 .felt-hole .felt-hole-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  /* Full lg pair ≈ 204 × 134; + label ≈ 168 tall when the name is showing. */
+  transform: scale(min(1, 100cqw / 204px, 100cqh / 168px));
+  transform-origin: top center;
+}
+
+.felt-z3 .felt-hole .felt-hole-cluster:not(:has(.felt-hole-handname)) {
+  /* Face-down: no label, fit cards alone. */
+  transform: scale(min(1, 100cqw / 204px, 100cqh / 134px));
+}
+
+.felt-z3 .felt-hole .felt-hole-cluster:has(.playing-card[data-half='true']) {
+  /* Half-card pair ≈ 268 × 101 (+ label ≈ 135). */
+  transform: scale(min(1, 100cqw / 268px, 100cqh / 135px));
+}
+
+.felt-z3 .felt-hole .felt-hole-cluster:has(.playing-card[data-half='true']):not(
+    :has(.felt-hole-handname)
+  ) {
+  transform: scale(min(1, 100cqw / 268px, 100cqh / 101px));
 }
 
 .felt-z3 .felt-hole .cards {
@@ -3571,16 +3638,10 @@ select {
   flex-wrap: nowrap;
   gap: 0.35rem;
   margin: 0;
-  /* Full lg pair ≈ 204 × 134. Shrink to whichever axis runs out first. */
-  transform: scale(min(1, 100cqw / 204px, 100cqh / 134px));
-  /* Top origin keeps the pair high so it lines up with the action column. */
-  transform-origin: top center;
 }
 
 .felt-z3 .felt-hole .cards:has(.playing-card[data-half='true']) {
   gap: 0.25rem;
-  /* Half-card pair ≈ 268 × 101 (wider and shorter). */
-  transform: scale(min(1, 100cqw / 268px, 100cqh / 101px));
 }
 
 /* Peek hint over face-down hole cards — the cards are dealt covered. */
@@ -3634,22 +3695,27 @@ select {
 .felt-z3 .felt-stack-target strong {
   display: block;
   line-height: 1.1;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-variant-numeric: tabular-nums;
 }
 
-/* Live bet chips sit on top of the stack pill (toward the pot). */
+/*
+ * Live bet stays high (toward the pot). Stack + avatar sit lower with the
+ * hole cards — the gap is the deliberate separation between "what I put in"
+ * and "what I still have / who I am".
+ */
 .felt-hero-stack {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.12rem;
+  gap: 1.15rem;
 }
 
 .felt-hero-bet {
-  /* Pull slightly toward the table so it reads as chips thrown in. */
-  margin-bottom: -0.05rem;
+  /* Anchored at the top of the stack column; no pull into the stack pill. */
+  margin-bottom: 0;
+  flex-shrink: 0;
 }
 
 .felt-z3 .felt-my-hand {
@@ -4141,8 +4207,9 @@ select {
 }
 
 /*
- * My seat: avatar + clock, stack (with live bet chips on top), and end-hand
+ * My seat: avatar + clock, stack (live bet above, separated), and end-hand
  * cards / all-in mark. Always on screen — it is where the pot lands.
+ * align-items:end keeps avatar + dealer level with the stack pill (not the bet).
  */
 .felt-hero-seat {
   flex-shrink: 0;
@@ -4151,7 +4218,7 @@ select {
   grid-template-columns: auto auto minmax(0, 1fr);
   align-items: end;
   gap: 0.4rem;
-  padding: 0.05rem 0.25rem;
+  padding: 0.05rem 0.25rem 0.15rem;
   min-width: 0;
 }
 
@@ -5009,7 +5076,7 @@ select {
   flex: none;
 }
 .felt-seat-bet-amt {
-  font-size: 0.6rem;
+  font-size: 0.78rem;
   font-weight: 800;
   color: #fde68a;
   font-variant-numeric: tabular-nums;
@@ -5019,6 +5086,83 @@ select {
   display: inline-flex;
   align-items: center;
   flex: none;
+}
+
+/*
+ * All-in badge: triangle + ALL-IN + shove amount. Must read from across the
+ * table — hotter than a normal bet chip, never a lone grey triangle.
+ */
+.felt-allin-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  flex: none;
+  padding: 0.14rem 0.4rem 0.14rem 0.28rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 186, 90, 0.75);
+  background: linear-gradient(180deg, #3a1608 0%, #1a0a06 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 120, 40, 0.35),
+    0 0 14px rgba(255, 120, 40, 0.45),
+    inset 0 1px 0 rgba(255, 220, 160, 0.2);
+  color: #fff7ed;
+  line-height: 1;
+  isolation: isolate;
+  overflow: hidden;
+  max-width: 100%;
+}
+.felt-allin-badge--md {
+  gap: 0.28rem;
+  padding: 0.22rem 0.55rem 0.22rem 0.38rem;
+  box-shadow:
+    0 0 0 1px rgba(255, 120, 40, 0.4),
+    0 0 18px rgba(255, 130, 40, 0.55),
+    inset 0 1px 0 rgba(255, 220, 160, 0.22);
+}
+.felt-allin-badge-mark {
+  flex: none;
+  filter: drop-shadow(0 0 3px rgba(255, 180, 60, 0.7));
+}
+.felt-allin-badge-text {
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #ffd089;
+  text-shadow: 0 0 8px rgba(255, 140, 40, 0.55);
+}
+.felt-allin-badge--md .felt-allin-badge-text {
+  font-size: 0.68rem;
+}
+.felt-allin-badge-amt {
+  font-size: 0.74rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff8e7;
+  white-space: nowrap;
+}
+.felt-allin-badge--md .felt-allin-badge-amt {
+  font-size: 0.88rem;
+}
+.felt-allin-badge.fire-fx::before {
+  inset: -2px;
+  opacity: 0.9;
+  border-radius: inherit;
+  background:
+    radial-gradient(130% 95% at 50% 120%, rgba(255, 170, 60, 0.75), rgba(255, 90, 20, 0) 62%),
+    radial-gradient(90% 80% at 20% 120%, rgba(255, 90, 30, 0.55), transparent 58%),
+    radial-gradient(90% 80% at 80% 120%, rgba(255, 210, 80, 0.5), transparent 58%);
+}
+
+/* Seat / stack tint while shoved so the all-in reads without the badge alone. */
+.felt-seat-pill.is-allin {
+  box-shadow:
+    0 0 0 1px rgba(255, 140, 50, 0.45),
+    0 0 12px rgba(255, 120, 40, 0.28);
+}
+.felt-stack-target.is-allin {
+  border-color: rgba(255, 150, 60, 0.55);
+  box-shadow: 0 0 10px rgba(255, 120, 40, 0.25);
 }
 
 /* F — all-in triangle + subtle fire. */
@@ -5130,16 +5274,23 @@ select {
   .felt-z3-body .felt-hole {
     flex: 1 1 56%;
     min-width: 0;
-    /* Stretch the card stage so scale still fills height, but pin cards high. */
+    /* Stretch the card stage; cards stay slightly lower than the live bet. */
     align-self: stretch;
     align-items: flex-start;
+    padding-top: 0.55rem;
   }
-  /* Stats + buttons ride the top of the column — reclaim the dead air above. */
+  /*
+   * Climb into the empty right half of the hero-seat row so Equity / Pot odds
+   * sit high (level with the live bet), separate from the lowered hole cards.
+   */
   .felt-z3-body .felt-actionbar {
     flex: 0 0 44%;
     justify-content: flex-start;
     gap: 0.2rem;
     padding-top: 0;
+    margin-top: -2.65rem;
+    position: relative;
+    z-index: 2;
   }
   .felt-z3-body .felt-stats {
     padding: 0;

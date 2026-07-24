@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { RoomSummary } from '@poker/shared';
-import { filterRooms, MAX_ACTIVE_ROOMS } from './roomFilter';
-import { canDeleteRoomFromDirectory } from './roomDeleteEligibility';
 import { ConfirmModal } from './ConfirmModal';
+import { formatChips } from './feltStats';
+import { canDeleteRoomFromDirectory } from './roomDeleteEligibility';
+import { filterRooms, MAX_ACTIVE_ROOMS } from './roomFilter';
 
 export function RoomBrowser({
   rooms,
@@ -59,7 +60,8 @@ export function RoomBrowser({
                 <div className="home-room-info">
                   <strong className="home-room-name">{room.name}</strong>
                   <span className="home-room-meta">
-                    Ciegas {room.smallBlind}/{room.bigBlind} · {room.code}
+                    Ciegas {formatChips(room.smallBlind)}/{formatChips(room.bigBlind)} ·{' '}
+                    {room.code}
                   </span>
                 </div>
                 <div className="home-room-actions">

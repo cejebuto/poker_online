@@ -34,7 +34,8 @@ export function WinCelebration({
     return () => window.clearTimeout(t);
   }, [open, onDone]);
 
-  if (!open) return null;
+  // Never flash "¡Ganaste! 0" — a zero payout is not a win celebration.
+  if (!open || payout <= 0) return null;
 
   const pieces = reduce ? [] : confettiPieces(confettiCount({ payout, bigBlind }), seedFromHandId(handId));
 

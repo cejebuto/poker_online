@@ -1,4 +1,5 @@
 import type { PlayerActionName, PublicPlayer } from '@poker/shared';
+import { formatChips } from './feltStats';
 
 type HandResult = { payouts: Record<number, number>; winners: number[] };
 
@@ -7,8 +8,6 @@ type AutoAction = {
   action: PlayerActionName;
   reason: 'timeout' | 'disconnect';
 };
-
-const chips = new Intl.NumberFormat('es-AR');
 
 /** Seat as a person: avatar + name when we still know them. */
 export function seatLabel(seat: number, players: readonly PublicPlayer[]): string {
@@ -29,13 +28,16 @@ export function describeHandResult(
   if (result.winners.length === 1) {
     const seat = result.winners[0]!;
     const amount = result.payouts[seat] ?? 0;
-    const noun = amount === 1 ? 'ficha' : 'fichas';
-    return `Ganó ${label(seat, players)} · ${chips.format(amount)} ${noun}`;
+    if (amount <= 0) return `Ganó ${label(seat, players)}`;
+    return `Ganó ${label(seat, players)} · ${formatChips(amount)}`;
   }
 
-  const parts = result.winners.map(
-    (seat) => `${label(seat, players)} ${chips.format(result.payouts[seat] ?? 0)}`,
-  );
+  const parts = result.winners.map((seat) => {
+    const amount = result.payouts[seat] ?? 0;
+    return amount > 0
+      ? `${label(seat, players)} ${formatChips(amount)}`
+      : label(seat, players);
+  });
   return `Bote dividido: ${parts.join(' · ')}`;
 }
 
