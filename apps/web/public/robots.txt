@@ -1,0 +1,54 @@
+# Poker con Amigos — https://juegapoker.online/
+# Hobby Texas Hold'em: no money, no registration.
+
+User-agent: *
+Allow: /
+Allow: /llms.txt
+Allow: /sitemap.xml
+Allow: /humans.txt
+Allow: /ai.txt
+Allow: /manifest.webmanifest
+Allow: /pwa-192.png
+Allow: /pwa-512.png
+
+# Prefer the marketing shell; gameplay is a client-side SPA.
+Disallow: /api/
+Disallow: /ws
+Disallow: /health
+Disallow: /metrics
+
+# Explicit welcome for common search + AI crawlers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://juegapoker.online/sitemap.xml

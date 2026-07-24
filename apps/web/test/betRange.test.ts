@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { betSliderRange, potSizedTotal } from '../src/features/betRange.js';
+import {
+  amountFromSliderY,
+  betSliderRange,
+  potSizedTotal,
+  sliderFillRatio,
+  snapBetAmount,
+} from '../src/features/betRange.js';
 import { clampBetAmount } from '../src/chips/denominations.js';
 
 describe('betSliderRange', () => {
@@ -73,6 +79,47 @@ describe('betSliderRange', () => {
         `clamp moved ${amount}`,
       );
     }
+  });
+});
+
+describe('snapBetAmount', () => {
+  it('floors to 0.1K steps', () => {
+    assert.equal(snapBetAmount(2148, 100, 10_000), 2100);
+    assert.equal(snapBetAmount(2199, 100, 10_000), 2100);
+    assert.equal(snapBetAmount(2200, 100, 10_000), 2200);
+  });
+
+  it('keeps min and all-in (max) reachable', () => {
+    assert.equal(snapBetAmount(50, 100, 987), 100);
+    assert.equal(snapBetAmount(987, 100, 987), 987);
+    assert.equal(snapBetAmount(9999, 100, 987), 987);
+  });
+});
+
+describe('amountFromSliderY', () => {
+  const track = { trackTop: 100, trackHeight: 200, min: 100, max: 1100 };
+
+  it('maps the top of the track to all-in (max)', () => {
+    assert.equal(amountFromSliderY({ ...track, clientY: 100 }), 1100);
+  });
+
+  it('maps the bottom of the track to min', () => {
+    assert.equal(amountFromSliderY({ ...track, clientY: 300 }), 100);
+  });
+
+  it('maps the middle to a 0.1K-snapped mid amount', () => {
+    assert.equal(amountFromSliderY({ ...track, clientY: 200 }), 600);
+  });
+});
+
+describe('sliderFillRatio', () => {
+  it('is 0 at min and 1 at max', () => {
+    assert.equal(sliderFillRatio(100, 100, 1100), 0);
+    assert.equal(sliderFillRatio(1100, 100, 1100), 1);
+  });
+
+  it('is 1 when only all-in is legal', () => {
+    assert.equal(sliderFillRatio(400, 400, 400), 1);
   });
 });
 

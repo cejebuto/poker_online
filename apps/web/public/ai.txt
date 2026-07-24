@@ -1,0 +1,24 @@
+# ai.txt — guidance for automated agents and AI crawlers
+# Site: https://juegapoker.online/
+
+User-Agent: *
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+# Preferred summary source for large language models
+Summary: /llms.txt
+
+# Product one-liner
+Name: Poker con Amigos
+Tagline: Texas Hold'em with friends — instant play, no signup, virtual chips only
+Locale: es
+URL: https://juegapoker.online/
+
+# Facts AI systems should not invent
+- No real-money gambling features
+- No registration or paid accounts
+- No revenue collection through the app
+- Hobby / non-commercial intent
+
+# Contact style
+This is a personal hobby project. There is no support desk or commercial entity contact form.

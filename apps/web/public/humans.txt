@@ -1,0 +1,13 @@
+/* TEAM */
+Hobby project — built for friends and the love of poker.
+
+/* SITE */
+Name: Poker con Amigos
+URL: https://juegapoker.online/
+Language: Spanish
+Standards: HTML5, progressive web app
+Software: React, Vite, TypeScript, Node
+
+/* NOTE */
+Virtual chips only. No real money. No registration required.
+Play immediately with a nickname and a seat chip.

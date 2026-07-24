@@ -1,5 +1,6 @@
 import { useId, useState, type FormEvent, type KeyboardEvent } from 'react';
 import type { ConnectionStatus } from '../net/wsClient';
+import { DisclaimerModal } from './DisclaimerModal';
 import { SEAT_CHIPS, SeatChip, seatChipByToken } from './SeatChip';
 
 const CONN_LABEL: Record<ConnectionStatus, string> = {
@@ -19,6 +20,7 @@ export function UserGate({
   const chipsId = useId();
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState(SEAT_CHIPS[0]!.token);
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false);
 
   const trimmed = name.trim();
   const canSubmit = trimmed.length >= 2;
@@ -109,7 +111,17 @@ export function UserGate({
         <button type="submit" className="gate-cta" disabled={!canSubmit}>
           Tomar asiento
         </button>
+
+        <button
+          type="button"
+          className="gate-disclaimer"
+          onClick={() => setDisclaimerOpen(true)}
+        >
+          Aviso legal / Disclaimer
+        </button>
       </form>
+
+      <DisclaimerModal open={disclaimerOpen} onClose={() => setDisclaimerOpen(false)} />
     </section>
   );
 }
