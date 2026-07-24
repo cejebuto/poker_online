@@ -74,7 +74,7 @@ export function NextHandPrompt({
       ) : null}
 
       {showRebuy ? (
-        <p className="meta">Te quedaste sin fichas. Recomprá para seguir jugando.</p>
+        <p className="meta">Te quedaste sin fichas. Recompra para seguir jugando.</p>
       ) : null}
 
       {!autoDealing && waiting.length && enoughPlayers ? (

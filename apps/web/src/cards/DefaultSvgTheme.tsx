@@ -139,7 +139,7 @@ function BackSvg({ size, half = false }: { size: CardSize; half?: boolean }) {
 
 export const defaultSvgTheme: CardTheme = {
   id: 'default-svg',
-  name: 'Default SVG',
+  name: 'Clásico',
   renderFace(card, size, opts?: CardRenderOptions) {
     return <FaceSvg card={card} size={size} half={opts?.half} />;
   },

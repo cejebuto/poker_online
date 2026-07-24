@@ -201,9 +201,25 @@ body {
 
 .gate-chips {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.35rem;
   justify-items: center;
+}
+
+/* Avatar art wrapper — selection reads as a glow that follows any silhouette
+   (round chip, fox, flame…), not a box around a rectangle. */
+.seat-avatar {
+  display: inline-grid;
+  place-items: center;
+  line-height: 0;
+}
+.seat-avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.seat-avatar.is-selected svg {
+  filter: drop-shadow(0 0 2px #d4b06a) drop-shadow(0 0 5px rgba(212, 176, 106, 0.55));
 }
 
 .gate-chip {
@@ -372,8 +388,8 @@ body {
   }
 
   .gate-chips {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    max-width: 14rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    max-width: 16rem;
   }
 
   .gate-cta {
@@ -4913,6 +4929,124 @@ select {
 .check-row small {
   display: block;
   font-size: 0.78rem;
+}
+
+/* Custom card-theme select (face + back preview per option) */
+.card-theme-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.card-theme-select-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #94a3b8;
+}
+
+.card-theme-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.65rem;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.card-theme-select-trigger.is-open {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 2px #4ade8033;
+}
+
+.card-theme-select-chevron {
+  flex: none;
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.card-theme-select-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: min(50vh, 18rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 0.65rem;
+  border: 1px solid #334155;
+  background: #0b1220;
+  scrollbar-width: thin;
+}
+
+.card-theme-select-option {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.card-theme-select-option:hover,
+.card-theme-select-option:focus-visible {
+  background: #1e293b;
+  outline: none;
+}
+
+.card-theme-select-option.is-selected {
+  border-color: #4ade80;
+  background: #14532d55;
+}
+
+.card-theme-select-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.card-theme-select-previews {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+}
+
+.card-theme-select-card {
+  display: block;
+  line-height: 0;
+  border-radius: 0.3rem;
+  box-shadow: 0 1px 3px #0006;
+}
+
+.card-theme-select-card .card-svg {
+  display: block;
+}
+
+.card-theme-select-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-settings .card-theme-select {
+  margin: 0.5rem 0 0.75rem;
 }
 
 .felt-menu-swatches {

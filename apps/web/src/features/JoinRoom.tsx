@@ -48,8 +48,8 @@ export function JoinRoom({
         <h1 className="join-title">{isMesa ? 'Entrar para ver' : 'Unirse a la sala'}</h1>
         <p className="join-sub">
           {isMesa
-            ? 'Conectá este dispositivo como mesa compartida. No ocupa un asiento.'
-            : 'Ingresá el código de la sala (o el link) y la contraseña si tiene.'}
+            ? 'Conecta este dispositivo como mesa compartida. No ocupa un asiento.'
+            : 'Ingresa el código de la sala (o el link) y la contraseña si tiene.'}
         </p>
       </header>
 

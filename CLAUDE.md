@@ -94,7 +94,7 @@ Cards are pluggable SVG themes via a registry ([`apps/web/src/cards/`](apps/web/
 
 - Pure domain code returns `Result<T, GameError>` (`ok()` / `err()` from shared) rather than throwing. Errors carry a stable machine `code` that maps onto the `{ type: 'error', code, message }` WS event.
 - Room passwords: 6 letters, bcrypt-hashed, never present in any payload. JWT HS256 from `JWT_SECRET`, 7d expiry; rotating the secret invalidates all sessions.
-- **User-facing UI copy and product docs are in Spanish.** Code, identifiers, comments and commit messages are English. Match what's already in the file you're editing.
+- **User-facing UI copy and product docs are in neutral Spanish (tuteo: tú/eres/puedes — not Argentine voseo: vos/sos/podés).** Code, identifiers, comments and commit messages are English. Match what's already in the file you're editing.
 - Prettier + ESLint are CI gates (`pnpm lint` runs with `--max-warnings 0`).
 
 ## Testing

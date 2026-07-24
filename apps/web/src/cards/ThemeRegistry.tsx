@@ -9,10 +9,28 @@ import {
 import type { CardTheme } from './CardTheme';
 import { defaultSvgTheme } from './DefaultSvgTheme';
 import { balatroSvgTheme } from './BalatroSvgTheme';
+import { slayTheSpireSvgTheme } from './SlayTheSpireSvgTheme';
+import { inscryptionSvgTheme } from './InscryptionSvgTheme';
+import { yugiohSvgTheme } from './YugiohSvgTheme';
+import { pokemonSvgTheme } from './PokemonSvgTheme';
+import { digimonSvgTheme } from './DigimonSvgTheme';
+import { unoSvgTheme } from './UnoSvgTheme';
 import {
   createAssetCardTheme,
   type AssetThemeConfig,
 } from './AssetCardTheme';
+
+/** Built-in parametric SVG decks (plus any URL/folder packs registered at runtime). */
+const BUILTIN_THEMES: CardTheme[] = [
+  defaultSvgTheme,
+  balatroSvgTheme,
+  slayTheSpireSvgTheme,
+  inscryptionSvgTheme,
+  yugiohSvgTheme,
+  pokemonSvgTheme,
+  digimonSvgTheme,
+  unoSvgTheme,
+];
 
 const STORAGE_KEY = 'poker.cardTheme';
 const CUSTOM_KEY = 'poker.cardTheme.custom';
@@ -78,7 +96,7 @@ function saveCustomConfigs(configs: AssetThemeConfig[]): void {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [builtin] = useState<CardTheme[]>([defaultSvgTheme, balatroSvgTheme]);
+  const [builtin] = useState<CardTheme[]>(() => BUILTIN_THEMES);
   const [custom, setCustom] = useState<CardTheme[]>(() => loadCustomThemes());
   const [customConfigs, setCustomConfigs] = useState<AssetThemeConfig[]>(() => {
     try {

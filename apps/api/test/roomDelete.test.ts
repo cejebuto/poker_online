@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it, after } from 'node:test';
 import { ROOM_DELETE_ADMIN_NAME } from '@poker/shared';
-import { createRoom, joinRoom, forceDeleteSoloRoom } from '../src/domain/roomService.js';
+import {
+  createRoom,
+  joinRoom,
+  forceDeleteSoloRoom,
+  getServiceError,
+} from '../src/domain/roomService.js';
 import { roomRegistry } from '../src/domain/roomRegistry.js';
 import { _clearAllTimersForTests } from '../src/domain/timerService.js';
-import { getServiceError } from '../src/domain/roomService.js';
 
 let seq = 0;
 

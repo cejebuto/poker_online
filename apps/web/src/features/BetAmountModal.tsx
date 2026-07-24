@@ -240,7 +240,7 @@ export function BetAmountModal({
       >
         <div className="bet-modal-head">
           <h2 id={titleId} className="confirm-modal-title">
-            {range.kind === 'bet' ? '¿Cuánto apostás?' : '¿Cuánto subís?'}
+            {range.kind === 'bet' ? '¿Cuánto apuestas?' : '¿Cuánto subes?'}
           </h2>
           <div className="bet-modal-side-toggle" role="group" aria-label="Lado de la barra">
             <button
@@ -301,7 +301,7 @@ export function BetAmountModal({
             </label>
 
             {range.allInOnly ? (
-              <p className="meta small">Tu stack no cubre el mínimo legal: solo podés ir all-in.</p>
+              <p className="meta small">Tu stack no cubre el mínimo legal: solo puedes ir all-in.</p>
             ) : null}
 
             <div className="confirm-modal-actions">

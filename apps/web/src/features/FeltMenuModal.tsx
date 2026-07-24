@@ -135,7 +135,7 @@ export function FeltMenuModal({
                     {p.seat !== null && p.seat === button ? (
                       <span className="felt-dealer">D</span>
                     ) : null}
-                    {p.playerId === playerId ? <span className="meta"> · vos</span> : null}
+                    {p.playerId === playerId ? <span className="meta"> · tú</span> : null}
                   </span>
                   <span className="felt-menu-player-meta">
                     {formatChips(p.stack)}

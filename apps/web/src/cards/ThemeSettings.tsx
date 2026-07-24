@@ -5,6 +5,7 @@ import {
   themeFromFiles,
   validateAssetTheme,
 } from './AssetCardTheme';
+import { CardThemeSelect } from './CardThemeSelect';
 import { PlayingCard } from './PlayingCard';
 import type { Card } from '@poker/shared';
 
@@ -82,7 +83,10 @@ export function ThemeSettings({ onClose }: { onClose?: () => void }) {
         ) : null}
       </div>
 
-      <p className="muted">Tema activo: <strong>{activeId}</strong></p>
+      <p className="muted">
+        Tema activo:{' '}
+        <strong>{themes.find((t) => t.id === activeId)?.name ?? activeId}</strong>
+      </p>
 
       <div className="preview-row">
         <PlayingCard card={PREVIEW} size="md" />
@@ -90,16 +94,7 @@ export function ThemeSettings({ onClose }: { onClose?: () => void }) {
         <PlayingCard faceDown size="md" />
       </div>
 
-      <label className="field">
-        Tema
-        <select value={activeId} onChange={(e) => setActiveId(e.target.value)}>
-          {themes.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <CardThemeSelect themes={themes} activeId={activeId} onChange={setActiveId} />
 
       <h3>Cargar tema externo</h3>
       <label className="field">

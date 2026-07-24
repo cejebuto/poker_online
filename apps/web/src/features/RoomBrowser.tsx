@@ -46,7 +46,7 @@ export function RoomBrowser({
       {rooms === null ? (
         <p className="home-empty">Buscando mesas…</p>
       ) : rooms.length === 0 ? (
-        <p className="home-empty">No hay mesas activas. Creá una.</p>
+        <p className="home-empty">No hay mesas activas. Crea una.</p>
       ) : visible.length === 0 ? (
         <p className="home-empty">Ninguna mesa coincide con «{query}».</p>
       ) : (

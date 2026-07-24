@@ -52,6 +52,8 @@ export function App() {
   const resumeAttempted = useRef(false);
   /** Prevents double auto-start for the same completed hand. */
   const autoNextTokenRef = useRef<string | null>(null);
+  /** One-shot guard for invite-link / public-room auto-join. */
+  const publicJoinAttemptedRef = useRef<string | null>(null);
   const prefill = useMemo(() => joinRoomIdFromPath(), []);
 
   const openThemes = (from: Screen) => {
@@ -233,10 +235,51 @@ export function App() {
     wsRef.current?.send(event);
   };
 
-  // Refresh the directory whenever the user lands back on the home screen.
+  /** Public tables skip the password form and join/attach immediately. */
+  const joinPublicRoom = useCallback(
+    (room: RoomSummary, as: 'player' | 'mesa') => {
+      if (!user) return;
+      if (as === 'player' && room.players >= room.maxPlayers) return;
+      publicJoinAttemptedRef.current = room.roomId;
+      setBusy(true);
+      setError('');
+      setPickedRoom(room.code);
+      if (as === 'mesa') {
+        send({ type: 'mesa:attach', password: '', code: room.code });
+      } else {
+        send({
+          type: 'room:join',
+          password: '',
+          user: { displayName: user.displayName, avatar: user.avatar },
+          code: room.code,
+        });
+      }
+    },
+    [user],
+  );
+
+  // Refresh the directory on home (browse) and join screens (invite → public auto-join).
   useEffect(() => {
-    if (screen === 'home') wsRef.current?.send({ type: 'rooms:list' });
+    if (screen === 'home' || screen === 'join' || screen === 'mesa-join') {
+      wsRef.current?.send({ type: 'rooms:list' });
+    }
   }, [screen]);
+
+  // Invite link (/join/CODE) or directory row: public rooms enter as soon as we know.
+  useEffect(() => {
+    if (!user || !rooms?.length) return;
+    if (screen !== 'home' && screen !== 'join') return;
+    const raw = (pickedRoom ?? prefill)?.trim();
+    if (!raw) return;
+    const key = raw.toUpperCase();
+    const match = rooms.find(
+      (r) => r.code.toUpperCase() === key || r.roomId === raw,
+    );
+    if (!match || match.hasPassword) return;
+    if (match.players >= match.maxPlayers) return;
+    if (publicJoinAttemptedRef.current === match.roomId) return;
+    joinPublicRoom(match, 'player');
+  }, [user, rooms, screen, prefill, pickedRoom, joinPublicRoom]);
 
   // Host + partida automática: after the first hand (nextHand present), wait 2s and deal.
   useEffect(() => {
@@ -325,7 +368,7 @@ export function App() {
         setScreen('lobby');
         break;
       case 'leave':
-        if (needsLeaveConfirm(roomState?.phase) && !window.confirm('¿Salir de la mesa? Perdés tu asiento en la mano en curso.')) {
+        if (needsLeaveConfirm(roomState?.phase) && !window.confirm('¿Salir de la mesa? Pierdes tu asiento en la mano en curso.')) {
           return;
         }
         leaveRoom();
@@ -381,6 +424,10 @@ export function App() {
           rooms={rooms}
           onRefreshRooms={() => send({ type: 'rooms:list' })}
           onPickRoom={(room, as) => {
+            if (!room.hasPassword) {
+              joinPublicRoom(room, as);
+              return;
+            }
             setPickedRoom(room.code);
             setScreen(as === 'mesa' ? 'mesa-join' : 'join');
           }}

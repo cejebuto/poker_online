@@ -57,9 +57,9 @@ export function UserGate({
       <form className="gate-card" onSubmit={onSubmit}>
         <p className="gate-eyebrow">SIN CUENTA · JUEGO RÁPIDO</p>
         <h1 id="gate-title" className="gate-title">
-          ¿Quién sos?
+          ¿Quién eres?
         </h1>
-        <p className="gate-sub">Elegí un nombre y una ficha para tomar asiento en la mesa.</p>
+        <p className="gate-sub">Elige un nombre y un avatar para tomar asiento en la mesa.</p>
 
         <label className="gate-field" htmlFor={nameId}>
           <span className="gate-label">NOMBRE</span>
@@ -79,7 +79,7 @@ export function UserGate({
 
         <div className="gate-field" role="group" aria-labelledby={chipsId}>
           <span id={chipsId} className="gate-label">
-            TU FICHA
+            ELIGE TU AVATAR
           </span>
           <div className="gate-chips">
             {SEAT_CHIPS.map((c) => {

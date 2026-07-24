@@ -5,9 +5,18 @@ Game views (`PlayerView`, `TableView`) **must not** reference SVG/PNG files dire
 
 ## Built-in
 
-| id | name |
-|----|------|
-| `default-svg` | Parametric SVG (rank + suit + color). One component, not 52 files. |
+All built-ins are **parametric SVG** (one component, not 52 files). Franchise themes are fan-made looks — no original assets.
+
+| id | name | Signature look |
+|----|------|----------------|
+| `default-svg` | Clásico | Clean rank + suit |
+| `balatro` | Balatro | CRT cream, scanlines, chunky mono |
+| `slay-the-spire` | Slay the Spire | Parchment, iron/gold frame, class energy orbs |
+| `inscryption` | Inscryption | Wood frame, dirty paper, ink + watching eye |
+| `yugioh` | Yu-Gi-Oh! | Gold chrome, type frames, amber wave-vortex back |
+| `pokemon` | Pokémon | Energy border, type strip, ball back |
+| `digimon` | Digimon | Digivice orange, cyan grid, attribute colours |
+| `uno` | UNO | Solid suit colours, white oval, huge rank |
 
 ## `CardTheme` interface
 

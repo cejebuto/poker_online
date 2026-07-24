@@ -11,7 +11,7 @@ export default defineConfig({
         name: 'Poker con Amigos',
         short_name: 'Poker',
         description:
-          'Texas Hold\'em con amigos: jugá al instante sin registro. Fichas virtuales, sin dinero real.',
+          'Texas Hold\'em con amigos: juega al instante sin registro. Fichas virtuales, sin dinero real.',
         lang: 'es',
         dir: 'ltr',
         theme_color: '#0f172a',

@@ -336,7 +336,7 @@ function PlayerRow({
         <div className="lobby-player-name-row">
           <strong className="lobby-player-name">
             {player.displayName}
-            {isMe ? ' (vos)' : ''}
+            {isMe ? ' (tú)' : ''}
           </strong>
           {isHostSeat ? <span className="lobby-host-pill">HOST</span> : null}
           {showReady && player.ready ? <span className="lobby-ready-pill">LISTO</span> : null}

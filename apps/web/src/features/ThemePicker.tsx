@@ -1,3 +1,4 @@
+import { CardThemeSelect } from '../cards/CardThemeSelect';
 import { useCardTheme } from '../cards/ThemeRegistry';
 import { FELT_THEMES, type FeltTheme } from './feltTheme';
 
@@ -27,22 +28,14 @@ export function ThemePicker({
     <>
       <section className="felt-menu-section">
         <p className="felt-label">Cartas</p>
-        <label className="field">
-          Tema
-          <select
-            value={activeId}
-            onChange={(e) => {
-              setActiveId(e.target.value);
-              onPicked?.();
-            }}
-          >
-            {themes.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <CardThemeSelect
+          themes={themes}
+          activeId={activeId}
+          onChange={(id) => {
+            setActiveId(id);
+            onPicked?.();
+          }}
+        />
         {onOpenThemes ? (
           <button type="button" className="ghost small" onClick={onOpenThemes}>
             Ajustes avanzados (cargar set propio)

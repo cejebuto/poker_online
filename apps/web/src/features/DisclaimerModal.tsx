@@ -74,12 +74,12 @@ export function DisclaimerModal({
             la mesa. No vendemos datos y la app opera <strong>sin ánimo de lucro</strong>.
           </p>
           <p>
-            Al continuar, aceptás que el uso es por tu cuenta y riesgo, con fines
+            Al continuar, aceptas que el uso es por tu cuenta y riesgo, con fines
             exclusivamente recreativos, y que cualquier conducta ilegal o indebida es
             responsabilidad de la persona que use la aplicación.
           </p>
           <p className="disclaimer-modal-closing">
-            Jugá limpio, cuidá a tus amigos y que gane la mejor mano. ♠
+            Juega limpio, cuida a tus amigos y que gane la mejor mano. ♠
           </p>
         </div>
 
