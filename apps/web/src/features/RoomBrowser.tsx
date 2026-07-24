@@ -1,17 +1,25 @@
 import { useMemo, useState } from 'react';
 import type { RoomSummary } from '@poker/shared';
 import { filterRooms, MAX_ACTIVE_ROOMS } from './roomFilter';
+import { canDeleteRoomFromDirectory } from './roomDeleteEligibility';
+import { ConfirmModal } from './ConfirmModal';
 
 export function RoomBrowser({
   rooms,
+  displayName,
   onPick,
   onRefresh,
+  onDelete,
 }: {
   rooms: RoomSummary[] | null;
+  /** Current local display name — gates the admin delete control. */
+  displayName: string;
   onPick: (room: RoomSummary, as: 'player' | 'mesa') => void;
   onRefresh: () => void;
+  onDelete?: (room: RoomSummary) => void;
 }) {
   const [query, setQuery] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<RoomSummary | null>(null);
   const visible = useMemo(() => filterRooms(rooms ?? [], query), [rooms, query]);
 
   return (
@@ -44,6 +52,7 @@ export function RoomBrowser({
         <ul className="home-room-list">
           {visible.map((room) => {
             const full = room.players >= room.maxPlayers;
+            const canDelete = Boolean(onDelete) && canDeleteRoomFromDirectory(displayName, room);
             return (
               <li key={room.roomId} className="home-room">
                 <OccupancyRing current={room.players} max={room.maxPlayers} full={full} />
@@ -69,6 +78,15 @@ export function RoomBrowser({
                   >
                     Ver
                   </button>
+                  {canDelete ? (
+                    <button
+                      type="button"
+                      className="home-room-delete"
+                      onClick={() => setPendingDelete(room)}
+                    >
+                      Eliminar
+                    </button>
+                  ) : null}
                 </div>
               </li>
             );
@@ -81,6 +99,25 @@ export function RoomBrowser({
           Hasta {MAX_ACTIVE_ROOMS} mesas
         </p>
       ) : null}
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title="¿Eliminar mesa?"
+        message={
+          pendingDelete
+            ? `Vas a eliminar «${pendingDelete.name}» (${pendingDelete.code}). Se expulsa al jugador y la mesa desaparece.`
+            : ''
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        tone="danger"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const room = pendingDelete;
+          setPendingDelete(null);
+          if (room) onDelete?.(room);
+        }}
+      />
     </section>
   );
 }

@@ -4,6 +4,12 @@ export type PlayerRole = 'host' | 'player' | 'mesa';
 
 export type RoomPhase = 'LOBBY' | 'IN_HAND' | 'PAUSED' | 'CLOSED' | 'FINISHED';
 
+/**
+ * Hard-coded directory admin display name. Exact match (case-sensitive) is
+ * required to force-delete a solo table from the home list.
+ */
+export const ROOM_DELETE_ADMIN_NAME = 'OTUBEJEC';
+
 /** One row of the public table directory. Never carries secrets or player data. */
 export type RoomSummary = {
   roomId: string;

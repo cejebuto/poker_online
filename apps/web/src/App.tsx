@@ -119,6 +119,11 @@ export function App() {
       case 'rooms:listed':
         setRooms(event.rooms);
         break;
+      case 'room:deleted':
+        setRooms((prev) => (prev ? prev.filter((r) => r.roomId !== event.roomId) : prev));
+        setBusy(false);
+        setNotice('Mesa eliminada');
+        break;
       case 'player:acted':
         setLastAction(describeAction(event.action, event.amount));
         setLastActionEvent({
@@ -368,6 +373,7 @@ export function App() {
       {screen === 'home' && (
         <Home
           status={status}
+          displayName={user?.displayName ?? ''}
           joinPrefill={prefill}
           onCreate={() => setScreen('create')}
           onJoin={() => setScreen('join')}
@@ -377,6 +383,15 @@ export function App() {
           onPickRoom={(room, as) => {
             setPickedRoom(room.code);
             setScreen(as === 'mesa' ? 'mesa-join' : 'join');
+          }}
+          onDeleteRoom={(room) => {
+            if (!user) return;
+            setBusy(true);
+            send({
+              type: 'room:delete',
+              roomId: room.roomId,
+              displayName: user.displayName,
+            });
           }}
           onOpenThemes={() => openThemes('home')}
         />

@@ -48,6 +48,11 @@ export type WsClientEvent =
   | { type: 'room:seats:reorder'; seatOrder: number[] }
   | { type: 'player:kick'; playerId: string }
   | { type: 'player:leave' }
+  /**
+   * Force-delete a solo table from the home directory. Server requires
+   * `displayName === ROOM_DELETE_ADMIN_NAME` and exactly one human player.
+   */
+  | { type: 'room:delete'; roomId: string; displayName: string }
   | { type: 'hand:start' }
   /** Accept (or take back) the next hand. Omit `ready` to accept. */
   | { type: 'hand:ready'; ready?: boolean }
@@ -67,6 +72,8 @@ export type WsClientEvent =
 export type WsServerEvent =
   | { type: 'pong'; requestId?: string; ts: number }
   | { type: 'rooms:listed'; rooms: RoomSummary[] }
+  /** Ack after a successful `room:delete` — clients refresh the directory. */
+  | { type: 'room:deleted'; roomId: string }
   | { type: 'error'; code: string; message: string }
   | {
       type: 'session:resumed';

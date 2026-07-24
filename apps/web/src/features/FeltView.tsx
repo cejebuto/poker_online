@@ -549,32 +549,14 @@ export function FeltView({
 
       {/* ——— Z3: Mi zona (~40%) ——— */}
       <div className="felt-z3">
-        <div className="felt-z3-chrome">
-          {!betweenHands ? (
-            <button
-              type="button"
-              className="felt-hide-btn"
-              aria-pressed={holeFaceDown}
-              onClick={flipHole}
-            >
-              {holeFaceDown ? 'Ver' : 'Ocultar'}
-            </button>
-          ) : (
-            <span className="felt-hide-btn felt-hide-btn--ghost" aria-hidden />
-          )}
-
-          {isMyTurn ? (
+        {/* Slim strip only when it is my turn — no reserved spacer when idle. */}
+        {isMyTurn ? (
+          <div className="felt-z3-chrome">
             <div className="felt-your-turn" role="status" aria-live="assertive">
               Tu turno
             </div>
-          ) : (
-            <span className="felt-turn-spacer" aria-hidden />
-          )}
-
-          {/* The dealer button now rides next to my avatar (see felt-hero-seat),
-              which frees this side of the strip for a taller hole-card area. */}
-          <span className="felt-dealer-spacer" aria-hidden />
-        </div>
+          </div>
+        ) : null}
 
         {/*
           My seat lives outside the between-hands swap on purpose: the pot has
@@ -604,22 +586,30 @@ export function FeltView({
             ) : null}
           </div>
 
-          <div ref={stackTargetRef} className="felt-stack-target zone-felt-stack">
-            <ChipStackMini amount={stackShown} size="xs" className="felt-my-chips" />
-            <span className="felt-label">Tu stack</span>
-            <motion.strong
-              className="accent"
-              key={stackShown}
-              initial={celebrating && credited > 0 ? { scale: 1.12 } : false}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 22 }}
-            >
-              {formatChips(stackShown)}
-            </motion.strong>
+          {/* Stack pill with live bet chips stacked on top of it. */}
+          <div className="felt-hero-stack">
+            {!myShowdown?.cards.length && me?.status !== 'ALL_IN' && myBet > 0 ? (
+              <span className="felt-seat-bet-chip felt-hero-bet" aria-label={`Apuesta ${formatChips(myBet)}`}>
+                <ChipStackMini amount={myBet} size="xs" maxColumns={2} maxPerColumn={3} />
+                <span className="felt-seat-bet-amt">{formatChips(myBet)}</span>
+              </span>
+            ) : null}
+            <div ref={stackTargetRef} className="felt-stack-target zone-felt-stack">
+              <ChipStackMini amount={stackShown} size="xs" className="felt-my-chips" />
+              <motion.strong
+                className="accent"
+                key={stackShown}
+                initial={celebrating && credited > 0 ? { scale: 1.12 } : false}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+              >
+                {formatChips(stackShown)}
+              </motion.strong>
+            </div>
           </div>
 
           {/* At hand end my cards read here, small, right beside my stack — the
-              same size my opponents show. Otherwise: live bet chip / all-in mark. */}
+              same size my opponents show. Otherwise all-in mark when shoved. */}
           {myShowdown?.cards.length ? (
             <span className="felt-seat-hole felt-hero-hole" aria-label="Tus cartas">
               {myShowdown.cards.map((card, i) => (
@@ -630,16 +620,9 @@ export function FeltView({
             <span className="felt-seat-mark felt-seat-mark--allin" title="All-in">
               <AllInMark size={18} />
             </span>
-          ) : myBet > 0 ? (
-            <span className="felt-seat-bet-chip" aria-label={`Apuesta ${formatChips(myBet)}`}>
-              <ChipStackMini amount={myBet} size="xs" maxColumns={2} maxPerColumn={3} />
-              <span className="felt-seat-bet-amt">{formatChips(myBet)}</span>
-            </span>
           ) : (
             <span className="felt-hero-mark-spacer" aria-hidden />
           )}
-
-          <p className="felt-my-hand accent">{myHandName ?? '•••'}</p>
         </div>
 
         {showRebuy && !betweenHands ? (
@@ -663,8 +646,21 @@ export function FeltView({
         ) : (
           <div className="felt-z3-body">
             <div ref={holeZoneRef} className="felt-hole zone-felt-hole">
-              {/* Keyboard / screen-reader path is the "Ver" button above. */}
-              <div className="felt-hole-cards" onClick={onHoleClick}>
+              {/* Tap / swipe-x peeks; keyboard path is on this focusable region. */}
+              <div
+                className="felt-hole-cards"
+                role="button"
+                tabIndex={0}
+                aria-pressed={!holeFaceDown}
+                aria-label={holeFaceDown ? 'Ver cartas' : 'Ocultar cartas'}
+                onClick={onHoleClick}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onHoleClick();
+                  }
+                }}
+              >
                 <div className="cards">
                   {(hand?.yourCards ?? [null, null]).map((card, i) => (
                     <PlayingCard
@@ -678,13 +674,15 @@ export function FeltView({
                     />
                   ))}
                 </div>
-                {holeFaceDown && hand?.yourCards?.length ? (
-                  <span className="felt-hole-peek">Tocá para ver</span>
-                ) : null}
               </div>
+              {/* My current hand reads right under my cards. */}
+              {!holeFaceDown && myHandName ? (
+                <p className="felt-hole-handname accent">{myHandName}</p>
+              ) : null}
             </div>
 
             <div className="felt-actionbar">
+              {/* To call lives on the Call button — no third stat column. */}
               <div className="felt-stats zone-felt-stats">
                 <div>
                   <span className="felt-label">Equity</span>
@@ -715,10 +713,6 @@ export function FeltView({
                 <div>
                   <span className="felt-label">Pot odds</span>
                   <strong className="info">{odds ?? '—'}</strong>
-                </div>
-                <div>
-                  <span className="felt-label">To call</span>
-                  <strong>{formatChips(toCall)}</strong>
                 </div>
               </div>
 

@@ -8,6 +8,7 @@ import {
   attachConnection,
   createRoom,
   detachConnection,
+  forceDeleteSoloRoom,
   getServiceError,
   joinRoom,
   kickPlayer,
@@ -271,6 +272,44 @@ export async function handleClientEvent(
         session.playerId = undefined;
         session.role = undefined;
         broadcastSnapshots(roomId);
+        return;
+      }
+
+      case 'room:delete': {
+        const rl = rateLimit(`${session.connectionId}:delete`, RL.create.limit, RL.create.windowMs);
+        if (!rl.ok) {
+          hub.send(session.connectionId, {
+            type: 'error',
+            code: 'RATE_LIMIT',
+            message: 'Too many delete attempts',
+          });
+          return;
+        }
+        const roomId = event.roomId;
+        let evicted: string[] = [];
+        await roomLocks.withLock(roomId, () => {
+          const room = roomRegistry.get(roomId);
+          if (!room || room.phase === 'CLOSED') failNotFound();
+          evicted = forceDeleteSoloRoom(room, event.displayName);
+        });
+        // Kick every occupant still attached to this room (the solo player + mesa).
+        hub.broadcastMap(roomId, (s) => {
+          if (s.roomId !== roomId) return null;
+          if (s.playerId && evicted.includes(s.playerId)) {
+            hub.send(s.connectionId, error('KICKED', 'La mesa fue eliminada'));
+          } else {
+            hub.send(s.connectionId, error('ROOM_NOT_FOUND', 'La mesa fue eliminada'));
+          }
+          s.roomId = undefined;
+          s.playerId = undefined;
+          s.role = undefined;
+          return null;
+        });
+        hub.send(session.connectionId, { type: 'room:deleted', roomId });
+        hub.send(session.connectionId, {
+          type: 'rooms:listed',
+          rooms: listActiveRooms(),
+        });
         return;
       }
 

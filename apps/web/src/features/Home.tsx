@@ -10,6 +10,7 @@ const CONN_LABEL: Record<ConnectionStatus, string> = {
 
 export function Home({
   status,
+  displayName,
   onCreate,
   onJoin,
   onMesa,
@@ -17,9 +18,11 @@ export function Home({
   rooms,
   onPickRoom,
   onRefreshRooms,
+  onDeleteRoom,
   onOpenThemes,
 }: {
   status: ConnectionStatus;
+  displayName: string;
   onCreate: () => void;
   onJoin: () => void;
   onMesa: () => void;
@@ -27,6 +30,7 @@ export function Home({
   rooms: RoomSummary[] | null;
   onPickRoom: (room: RoomSummary, as: 'player' | 'mesa') => void;
   onRefreshRooms: () => void;
+  onDeleteRoom?: (room: RoomSummary) => void;
   onOpenThemes?: () => void;
 }) {
   return (
@@ -61,7 +65,13 @@ export function Home({
         </div>
       </section>
 
-      <RoomBrowser rooms={rooms} onPick={onPickRoom} onRefresh={onRefreshRooms} />
+      <RoomBrowser
+        rooms={rooms}
+        displayName={displayName}
+        onPick={onPickRoom}
+        onRefresh={onRefreshRooms}
+        onDelete={onDeleteRoom}
+      />
 
       {onOpenThemes ? (
         <button type="button" className="home-themes" onClick={onOpenThemes}>

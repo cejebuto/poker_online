@@ -1,5 +1,5 @@
 import type { RoomConfig, UserInfo } from '@poker/shared';
-import { sanitizeDisplayName } from '@poker/shared';
+import { ROOM_DELETE_ADMIN_NAME, sanitizeDisplayName } from '@poker/shared';
 import { hashPassword, validateRoomPassword, verifyPassword } from '../auth/password.js';
 import { signSession } from '../auth/jwt.js';
 import { env } from '../config/env.js';
@@ -411,12 +411,48 @@ export function scheduleDestroyIfEmpty(room: InternalRoom): void {
     destroyTimers.set(room.roomId, t);
   } else {
     room.emptySince = null;
-    const t = destroyTimers.get(room.roomId);
-    if (t) {
-      clearTimeout(t);
-      destroyTimers.delete(room.roomId);
-    }
+    clearDestroyTimer(room.roomId);
   }
+}
+
+function clearDestroyTimer(roomId: string): void {
+  const t = destroyTimers.get(roomId);
+  if (t) {
+    clearTimeout(t);
+    destroyTimers.delete(roomId);
+  }
+}
+
+/**
+ * Admin force-delete from the home directory.
+ * Requires exact `ROOM_DELETE_ADMIN_NAME` and exactly one human player
+ * (mesa screens do not count toward the solo check but are also evicted).
+ * @returns playerIds that were in the room (for disconnect / kick fan-out).
+ */
+export function forceDeleteSoloRoom(room: InternalRoom, actorDisplayName: string): string[] {
+  if (actorDisplayName !== ROOM_DELETE_ADMIN_NAME) {
+    fail('FORBIDDEN', 'Only the admin user can delete rooms');
+  }
+  const humans = [...room.players.values()].filter((p) => p.role !== 'mesa');
+  if (humans.length !== 1) {
+    fail('INVALID_STATE', 'Room can only be deleted when exactly one player remains');
+  }
+  const evictedIds = [...room.players.keys()];
+  room.players.clear();
+  room.phase = 'CLOSED';
+  room.version += 1;
+  room.emptySince = Date.now();
+  clearDestroyTimer(room.roomId);
+  roomRegistry.delete(room.roomId);
+  void persistRoomMeta(room);
+  console.log(
+    JSON.stringify({
+      msg: 'room:force-deleted',
+      roomId: room.roomId,
+      by: ROOM_DELETE_ADMIN_NAME,
+    }),
+  );
+  return evictedIds;
 }
 
 export function getServiceError(err: unknown): ServiceError {
