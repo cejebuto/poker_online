@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ROULETTE, formatChips, pocketByIndex, type RoundPhase } from '@roulette/core';
 import { useRoulette } from './useRoulette';
 import { RouletteWheel } from './RouletteWheel';
 import { RouletteBoard } from './RouletteBoard';
 import { ChipRail } from './ChipRail';
+import { useRouletteJuice } from './juice/useRouletteJuice';
 import './roulette.css';
 
 const PHASE_LABEL: Record<RoundPhase, string> = {
@@ -21,13 +22,44 @@ export function RouletteScreen({
   onExit: () => void;
 }) {
   const rlt = useRoulette(user);
+  const juice = useRouletteJuice();
   const [chip, setChip] = useState<number>(ROULETTE.chips[0]);
   const [now, setNow] = useState(() => Date.now());
+  const lastSpinKey = useRef(0);
+  const lastResultKey = useRef(0);
+  const lastError = useRef<string | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
   }, []);
+
+  // Spin loop + decelerating stop (aligned to wheel animation).
+  useEffect(() => {
+    if (!rlt.spin || rlt.spin.key === lastSpinKey.current) return;
+    lastSpinKey.current = rlt.spin.key;
+    juice.startSpin({ durationMs: ROULETTE.spinningMs - 400 });
+  }, [rlt.spin, juice]);
+
+  // Win / lose toast SFX once per result.
+  useEffect(() => {
+    if (!rlt.result || rlt.result.key === lastResultKey.current) return;
+    if ((rlt.state?.phase ?? 'BETTING') !== 'PAYOUT') return;
+    lastResultKey.current = rlt.result.key;
+    if (rlt.result.payout > 0) juice.play('win');
+    else if (rlt.result.staked > 0) juice.play('lose');
+    // No stake: ball-drop already played at spin settle; no extra stinger.
+  }, [rlt.result, rlt.state?.phase, juice]);
+
+  // Error chime (server rejected a bet, etc.).
+  useEffect(() => {
+    if (!rlt.error || rlt.error === lastError.current) return;
+    lastError.current = rlt.error;
+    juice.play('error');
+  }, [rlt.error, juice]);
+
+  // Stop any lingering loop when leaving the screen.
+  useEffect(() => () => juice.stopSpin(), [juice]);
 
   const betsMap = useMemo(
     () => new Map(rlt.bets.map((b) => [b.spot, b.amount] as const)),
@@ -41,7 +73,7 @@ export function RouletteScreen({
   const players = rlt.state?.players ?? [];
 
   return (
-    <div className="rlt">
+    <div className="rlt" onPointerDownCapture={juice.unlock}>
       {/*
         Stage stays pinned: wheel never leaves the viewport while the bet felt
         scrolls underneath. Pure layout — no domain changes.
@@ -56,8 +88,23 @@ export function RouletteScreen({
             {PHASE_LABEL[phase]}
             {betting ? ` · ${secondsLeft}s` : ''}
           </div>
-          <div className="rlt-balance" title="Tu saldo">
-            {formatChips(rlt.balance)}
+          <div className="rlt-top-end">
+            <button
+              type="button"
+              className="rlt-mute"
+              aria-pressed={juice.muted}
+              aria-label={juice.muted ? 'Activar sonidos de ruleta' : 'Silenciar sonidos de ruleta'}
+              title={juice.muted ? 'Sonido apagado' : 'Sonido encendido'}
+              onClick={() => {
+                juice.unlock();
+                juice.toggleMuted();
+              }}
+            >
+              {juice.muted ? '🔇' : '🔊'}
+            </button>
+            <div className="rlt-balance" title="Tu saldo">
+              {formatChips(rlt.balance)}
+            </div>
           </div>
         </header>
 
@@ -106,12 +153,22 @@ export function RouletteScreen({
       </div>
 
       <div className="rlt-bets-scroll">
-        <ChipRail selected={chip} balance={rlt.balance} onSelect={setChip} />
+        <ChipRail
+          selected={chip}
+          balance={rlt.balance}
+          onSelect={(value) => {
+            juice.play('chip-select');
+            setChip(value);
+          }}
+        />
 
         <RouletteBoard
           bets={betsMap}
           disabled={!betting}
-          onBet={(spot) => rlt.placeBet(spot, chip)}
+          onBet={(spot) => {
+            juice.play('bet-place');
+            rlt.placeBet(spot, chip);
+          }}
         />
 
         <div className="rlt-actions">
@@ -119,12 +176,22 @@ export function RouletteScreen({
             type="button"
             className="rlt-btn"
             disabled={!betting || rlt.bets.length === 0}
-            onClick={rlt.clearBets}
+            onClick={() => {
+              juice.play('clear');
+              rlt.clearBets();
+            }}
           >
             Limpiar
           </button>
           {broke ? (
-            <button type="button" className="rlt-btn rlt-btn--gold" onClick={rlt.topUp}>
+            <button
+              type="button"
+              className="rlt-btn rlt-btn--gold"
+              onClick={() => {
+                juice.play('chip-select');
+                rlt.topUp();
+              }}
+            >
               Recargar
             </button>
           ) : null}
