@@ -9,6 +9,8 @@ export type ConfirmModalProps = {
   cancelLabel?: string;
   /** Visual weight of the confirm button */
   tone?: 'danger' | 'warn' | 'primary';
+  /** Optional themed panel treatment (e.g. the all-in "fire"). */
+  accent?: 'fire';
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -24,6 +26,7 @@ export function ConfirmModal({
   confirmLabel,
   cancelLabel = 'Cancelar',
   tone = 'primary',
+  accent,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -58,7 +61,7 @@ export function ConfirmModal({
         onClick={onCancel}
       />
       <motion.div
-        className="confirm-modal-panel"
+        className={`confirm-modal-panel${accent === 'fire' ? ' confirm-modal-panel--fire fire-fx' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

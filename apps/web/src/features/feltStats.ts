@@ -45,6 +45,22 @@ export function describeAction(action: PlayerActionName, amount: number): string
   return amount > 0 ? `${label} ${formatChips(amount)}` : label;
 }
 
+/** Just the verb ("Check", "Raise", "All-in") — for the floating action badge. */
+export function actionLabel(action: PlayerActionName): string {
+  return ACTION_LABEL[action];
+}
+
+/**
+ * The pot as chips already collected in the center: total committed minus what
+ * is still sitting in front of players this betting round. Those live bets ride
+ * beside each seat until the street changes and they sweep in, so the center
+ * number must not double-count them. Never negative.
+ */
+export function collectedPot(potTotal: number, players: readonly PublicPlayer[]): number {
+  const live = players.reduce((sum, p) => sum + (p.betThisRound ?? 0), 0);
+  return Math.max(0, potTotal - live);
+}
+
 export function streetLabel(phase: string | undefined): string {
   return phase ?? '—';
 }

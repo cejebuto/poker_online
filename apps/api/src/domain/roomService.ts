@@ -348,6 +348,11 @@ export function kickPlayer(room: InternalRoom, hostId: string, targetId: string)
   if (targetId === hostId) fail('FORBIDDEN', 'Host cannot kick self');
   const target = room.players.get(targetId);
   if (!target) fail('PLAYER_NOT_FOUND', 'Player not found');
+  // A connected player may only be removed between hands; an offline one can go
+  // any time so a dropped seat cannot freeze a live hand.
+  if (room.phase === 'IN_HAND' && target.connected) {
+    fail('INVALID_PHASE', 'Cannot kick an active player during a hand');
+  }
   room.players.delete(targetId);
   room.version += 1;
   return target;

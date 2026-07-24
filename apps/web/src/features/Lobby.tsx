@@ -1,9 +1,10 @@
 import { useEffect, useId, useState } from 'react';
-import QRCode from 'qrcode';
+import { toDataURL } from 'qrcode';
 import type { PublicPlayer, PublicRoomState } from '@poker/shared';
 import { NextHandPrompt } from './NextHandPrompt';
 import { canPlayerRebuy } from './rebuy';
 import { SEAT_CHIPS, SeatChip, seatChipByToken } from './SeatChip';
+import { useCopy } from './useCopy';
 
 export function Lobby({
   state,
@@ -24,7 +25,7 @@ export function Lobby({
   onRebuy?: () => void;
   autoNextHand?: boolean;
 }) {
-  const [copied, setCopied] = useState<'code' | 'link' | null>(null);
+  const { copied, copy } = useCopy<'code' | 'link'>();
   const [qrOpen, setQrOpen] = useState(false);
   const isHost = state.hostPlayerId === playerId;
   const seated = state.players.filter((p) => p.role !== 'mesa');
@@ -38,16 +39,6 @@ export function Lobby({
   const canRebuy = Boolean(onRebuy) && canPlayerRebuy(state, playerId);
   /** Ready-up prompt — only when the server exposes nextHand (post first hand). */
   const betweenHands = Boolean(state.nextHand) && state.phase === 'LOBBY';
-
-  const copy = async (kind: 'code' | 'link', value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(kind);
-      window.setTimeout(() => setCopied(null), 1600);
-    } catch {
-      /* clipboard may be blocked; ignore */
-    }
-  };
 
   return (
     <div className="lobby">
@@ -247,7 +238,7 @@ function JoinQrModal({
     let cancelled = false;
     setError('');
     setDataUrl(null);
-    void QRCode.toDataURL(joinUrl, {
+    void toDataURL(joinUrl, {
       width: 280,
       margin: 2,
       color: { dark: '#0c1f16', light: '#f7f3ea' },

@@ -3,6 +3,8 @@ import { useEffect, useId, useRef } from 'react';
 import type { PublicRoomState } from '@poker/shared';
 import { useJuice } from '../juice/useJuice';
 import { formatChips } from './feltStats';
+import { canKickFromTable } from './kickEligibility';
+import { useCopy } from './useCopy';
 import { ThemePicker } from './ThemePicker';
 
 export type FeltMenuModalProps = {
@@ -16,6 +18,7 @@ export type FeltMenuModalProps = {
   onFeltTheme: (id: string) => void;
   onEquity: (on: boolean) => void;
   onAutoNextHand: (on: boolean) => void;
+  onKick: (playerId: string) => void;
   onClose: () => void;
   onOpenThemes: () => void;
   onSwitchView: () => void;
@@ -38,6 +41,7 @@ export function FeltMenuModal({
   onFeltTheme,
   onEquity,
   onAutoNextHand,
+  onKick,
   onClose,
   onOpenThemes,
   onSwitchView,
@@ -46,6 +50,7 @@ export function FeltMenuModal({
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const { play, muted, toggleMuted } = useJuice();
+  const { copied, copy } = useCopy<'code' | 'link'>();
   const isHost = state.hostPlayerId === playerId;
 
   useEffect(() => {
@@ -94,6 +99,32 @@ export function FeltMenuModal({
 
         <div className="felt-menu-body">
           <section className="felt-menu-section">
+            <p className="felt-label">Invitar</p>
+            <div className="felt-menu-invite">
+              <button
+                type="button"
+                className="ghost small"
+                onClick={() => {
+                  void copy('code', state.code);
+                  play('tick');
+                }}
+              >
+                {copied === 'code' ? 'Código ✓' : `Copiar código · ${state.code}`}
+              </button>
+              <button
+                type="button"
+                className="ghost small"
+                onClick={() => {
+                  void copy('link', state.joinUrl);
+                  play('tick');
+                }}
+              >
+                {copied === 'link' ? 'Link ✓' : 'Copiar link'}
+              </button>
+            </div>
+          </section>
+
+          <section className="felt-menu-section">
             <p className="felt-label">Jugadores ({seated.length})</p>
             <ul className="felt-menu-players">
               {seated.map((p) => (
@@ -111,6 +142,19 @@ export function FeltMenuModal({
                     {p.status ? ` · ${p.status}` : ''}
                     {!p.connected ? ' · offline' : ''}
                   </span>
+                  {canKickFromTable(state, playerId, p) ? (
+                    <button
+                      type="button"
+                      className="felt-menu-kick"
+                      aria-label={`Expulsar a ${p.displayName}`}
+                      onClick={() => {
+                        onKick(p.playerId);
+                        play('tick');
+                      }}
+                    >
+                      Expulsar
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ul>

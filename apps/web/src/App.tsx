@@ -13,7 +13,7 @@ import { TableView } from './features/TableView';
 import { describeAutoAction } from './features/handResult';
 import { NextHandPrompt } from './features/NextHandPrompt';
 import { backFor, needsLeaveConfirm, type Screen } from './features/navigation';
-import { FeltView } from './features/FeltView';
+import { FeltView, type SeatActionEvent } from './features/FeltView';
 import { describeAction } from './features/feltStats';
 import { loadPlayViewMode, savePlayViewMode, type PlayViewMode } from './features/viewMode';
 import {
@@ -45,7 +45,9 @@ export function App() {
   const [playView, setPlayView] = useState<PlayViewMode>(() => loadPlayViewMode());
   const [autoNextHand, setAutoNextHand] = useState(() => loadAutoNextHand());
   const [lastAction, setLastAction] = useState<string | null>(null);
+  const [lastActionEvent, setLastActionEvent] = useState<SeatActionEvent | null>(null);
   const [pickedRoom, setPickedRoom] = useState<string | undefined>(undefined);
+  const actionSeqRef = useRef(0);
   const wsRef = useRef<WsHandle | null>(null);
   const resumeAttempted = useRef(false);
   /** Prevents double auto-start for the same completed hand. */
@@ -119,12 +121,24 @@ export function App() {
         break;
       case 'player:acted':
         setLastAction(describeAction(event.action, event.amount));
+        setLastActionEvent({
+          seat: event.seat,
+          action: event.action,
+          amount: event.amount,
+          id: ++actionSeqRef.current,
+        });
         break;
       case 'player:auto_acted': {
         const players = roomState?.players ?? [];
         const mySeat = players.find((p) => p.playerId === playerId)?.seat ?? null;
         setNotice(describeAutoAction(event, players, mySeat));
         setLastAction(describeAction(event.action, 0));
+        setLastActionEvent({
+          seat: event.seat,
+          action: event.action,
+          amount: 0,
+          id: ++actionSeqRef.current,
+        });
         break;
       }
       case 'hand:dealt':
@@ -441,6 +455,7 @@ export function App() {
               state={roomState}
               playerId={playerId}
               lastAction={lastAction}
+              lastActionEvent={lastActionEvent}
               autoNextHand={autoNextHand}
               onAutoNextHand={(on) => {
                 setAutoNextHand(on);
@@ -462,6 +477,7 @@ export function App() {
               onGoToLobby={() => setScreen('lobby')}
               onOpenThemes={() => openThemes('play')}
               onSwitchView={() => switchPlayView('classic')}
+              onKick={(id) => send({ type: 'player:kick', playerId: id })}
               onAction={(action, amount) => sendPlayerAction(action, amount)}
               onRebuy={() => send({ type: 'player:rebuy' })}
             />

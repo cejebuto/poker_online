@@ -8,6 +8,8 @@ import {
   tripleTargetAmount,
 } from '../src/features/feltActions.js';
 import {
+  actionLabel,
+  collectedPot,
   describeAction,
   formatChips,
   handCounts,
@@ -143,5 +145,33 @@ describe('feltActions (Vista Mesa)', () => {
     assert.equal(canAffordTotal(100, 20, 100), true); // needs 80
     assert.equal(canAffordTotal(50, 20, 100), false); // needs 80
     assert.equal(canAffordTotal(30, 0, 30), true);
+  });
+});
+
+describe('actionLabel', () => {
+  it('is just the verb, no amount', () => {
+    assert.equal(actionLabel('raise'), 'Raise');
+    assert.equal(actionLabel('all-in'), 'All-in');
+    assert.equal(actionLabel('check'), 'Check');
+  });
+});
+
+describe('collectedPot', () => {
+  it('subtracts this round bets from the total (chips ride beside the seats)', () => {
+    const players = [
+      player(0),
+      { ...player(1), betThisRound: 30 },
+      { ...player(2), betThisRound: 30 },
+    ];
+    // 100 committed, 60 still out this round -> 40 already in the center.
+    assert.equal(collectedPot(100, players), 40);
+  });
+
+  it('equals the total once bets have swept in (no live bets)', () => {
+    assert.equal(collectedPot(100, [player(0), player(1)]), 100);
+  });
+
+  it('never goes negative', () => {
+    assert.equal(collectedPot(20, [{ ...player(0), betThisRound: 50 }]), 0);
   });
 });

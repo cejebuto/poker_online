@@ -3078,6 +3078,17 @@ select {
 .felt {
   --felt-green: #14663f;
   --felt-dark: #0a3a24;
+  /*
+   * Tokens derived from the two felt stops so every on-felt surface (menus,
+   * confirms, the bet modal, the between-hands prompt) picks up the chosen
+   * theme instead of a hardcoded green. They inherit through the DOM, so even
+   * a position:fixed modal that is a child of .felt resolves them.
+   */
+  --felt-panel-bg: color-mix(in srgb, var(--felt-dark) 86%, #000 14%);
+  --felt-panel-border: color-mix(in srgb, var(--felt-green) 52%, #ffffff 10%);
+  --felt-accent: color-mix(in srgb, var(--felt-green) 62%, #ffffff 38%);
+  --felt-cta-bg: color-mix(in srgb, var(--felt-green) 82%, #ffffff 4%);
+  --felt-cta-bg-strong: color-mix(in srgb, var(--felt-green) 70%, #000 12%);
   position: relative;
   box-sizing: border-box;
   width: 100%;
@@ -3248,6 +3259,7 @@ select {
 }
 
 .felt-seat-pill {
+  position: relative;
   flex: 0 1 auto;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -3256,9 +3268,11 @@ select {
   min-width: 0;
   padding: 0.22rem 0.3rem;
   border-radius: 0.55rem;
-  background: rgba(4, 28, 18, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  /* Players sit straight on the felt — no dark card behind them. The green
+     "acting" ring is the only chrome that lights a seat up. */
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
 }
 
 /* Right rail: name/stack first, avatar last (facing the pot). */
@@ -4107,11 +4121,34 @@ select {
 .felt-hero-seat {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  /* id · stack · (my cards / bet chip / all-in) · hand name */
+  grid-template-columns: auto auto auto minmax(0, 1fr);
   align-items: center;
   gap: 0.5rem;
   padding: 0.15rem 0.25rem;
   min-width: 0;
+}
+
+/* Avatar + dealer puck + action bubble share one relative box. */
+.felt-hero-id {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.felt-hero-id .felt-dealer-me {
+  position: static;
+}
+
+.felt-hero-mark-spacer {
+  display: inline-block;
+  width: 0;
+}
+
+.felt-hero-hole {
+  display: flex;
+  gap: 0.1rem;
 }
 
 .felt-hero-seat .felt-my-hand {
@@ -4503,7 +4540,7 @@ select {
 .felt-buttons .call { background: #1d4ed8; }
 .felt-buttons .raise { background: #15803d; }
 .felt-buttons .triple { background: #b45309; }
-.felt-buttons .custom { background: #334155; }
+.felt-buttons .allin { background: #2b3340; }
 
 @media (prefers-reduced-motion: reduce) {
   .felt-buttons button {
@@ -4542,8 +4579,8 @@ select {
   width: min(22rem, 100%);
   border-radius: 0.9rem;
   padding: 1.1rem 1rem 1rem;
-  background: #0b1f17;
-  border: 1px solid #1f4d3a;
+  background: var(--felt-panel-bg, #0b1f17);
+  border: 1px solid var(--felt-panel-border, #1f4d3a);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
   color: #e2e8f0;
 }
@@ -4596,7 +4633,7 @@ select {
 }
 
 .confirm-modal-ok.tone-primary {
-  background: #15803d;
+  background: var(--felt-cta-bg, #15803d);
   color: #fff;
 }
 
@@ -4872,5 +4909,192 @@ select {
   .felt-board {
     grid-template-columns: 1.4fr 1fr;
     align-items: start;
+  }
+}
+
+/* ————————————————————————————————————————————————————————————————
+   Incremental felt UX: on-felt CTAs, invite/kick, live bet chips,
+   action bubbles, the all-in fire, and the short-phone hero layout.
+   ———————————————————————————————————————————————————————————————— */
+
+/* A — on-felt CTAs pick up the chosen felt accent. */
+.felt .next-hand .primary,
+.felt .felt-rebuy .primary {
+  background: var(--felt-cta-bg, #15803d);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* B/C — invite + kick controls in the table menu. */
+.felt-menu-invite {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.felt-menu-invite .ghost {
+  flex: 1 1 auto;
+}
+.felt-menu-players li {
+  align-items: center;
+}
+.felt-menu-players li .felt-menu-player-name {
+  flex: 1 1 auto;
+}
+.felt-menu-kick {
+  flex: none;
+  margin-left: 0.4rem;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  background: rgba(127, 29, 29, 0.4);
+  color: #fecaca;
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.felt-menu-kick:hover {
+  background: rgba(127, 29, 29, 0.6);
+}
+
+/* E — the bet out this round, drawn as a chip beside the name. */
+.felt-seat-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.felt-seat-pill--right .felt-seat-name-row {
+  flex-direction: row-reverse;
+}
+.felt-seat-name-row .felt-seat-pill-name {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.felt-seat-bet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  flex: none;
+}
+.felt-seat-bet-amt {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #fde68a;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.felt-seat-mark {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+/* F — all-in triangle + subtle fire. */
+.allin-mark {
+  display: block;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+.felt-buttons .allin {
+  position: relative;
+  overflow: hidden;
+  flex-direction: row;
+  gap: 0.25rem;
+}
+.allin-btn-mark {
+  display: inline-flex;
+  line-height: 0;
+}
+/* Two slow warm gradients + a faint flicker, tucked behind the content. */
+.fire-fx {
+  position: relative;
+  isolation: isolate;
+}
+.fire-fx::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background:
+    radial-gradient(120% 80% at 50% 118%, rgba(255, 174, 66, 0.55), rgba(255, 96, 32, 0) 60%),
+    radial-gradient(90% 70% at 28% 120%, rgba(255, 90, 30, 0.5), rgba(255, 90, 30, 0) 55%),
+    radial-gradient(90% 70% at 72% 120%, rgba(255, 210, 90, 0.45), rgba(255, 210, 90, 0) 55%);
+  animation: fire-flicker 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+.confirm-modal-panel--fire {
+  border-color: rgba(255, 150, 60, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(255, 140, 50, 0.25),
+    0 18px 48px rgba(0, 0, 0, 0.5);
+}
+.confirm-modal-panel--fire.fire-fx::before {
+  inset: -2px;
+  filter: blur(7px);
+  opacity: 0.8;
+}
+@keyframes fire-flicker {
+  0%, 100% { opacity: 0.72; transform: translateY(0) scaleY(1); }
+  25% { opacity: 0.95; transform: translateY(-1px) scaleY(1.04); }
+  50% { opacity: 0.66; transform: translateY(0) scaleY(0.98); }
+  75% { opacity: 0.9; transform: translateY(-1px) scaleY(1.03); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fire-fx::before { animation: none; }
+}
+
+/* G — a player's action floated over their seat. */
+.felt-action-float {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 0.15rem);
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  color: #08130d;
+  background: linear-gradient(180deg, #fef3c7, #fbbf24);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  animation: felt-action-pop 0.22s ease-out both;
+}
+.felt-hero-id .felt-action-float {
+  bottom: calc(100% + 0.1rem);
+}
+@keyframes felt-action-pop {
+  from { opacity: 0; transform: translate(-50%, 4px) scale(0.9); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .felt-action-float { animation: none; }
+}
+
+/* I — dealer puck by my avatar; short phones lay the hero zone out wide. */
+.felt-hero-id .felt-dealer-me {
+  width: 1.15rem;
+  height: 1.15rem;
+  line-height: 1.15rem;
+  font-size: 0.6rem;
+}
+@media (max-height: 700px) {
+  .felt-z3-body {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+  .felt-z3-body .felt-hole {
+    flex: 1 1 58%;
+    min-width: 0;
+  }
+  .felt-z3-body .felt-actionbar {
+    flex: 0 0 42%;
+    justify-content: center;
+  }
+  .felt-z3-body .felt-buttons {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

@@ -1,14 +1,13 @@
 import { useDrag } from '@use-gesture/react';
 import { motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import type { PublicPlayer, PublicRoomState } from '@poker/shared';
+import type { PlayerActionName, PublicPlayer, PublicRoomState } from '@poker/shared';
 import { CommunityRow, PlayingCard } from '../cards/PlayingCard';
 import { ChipStackMini } from '../chips/ChipStackMini';
 import { isSwipeFlip } from '../chips/gestureMath';
 import { centerOf, useChipFlights } from '../juice/ChipFlightLayer';
 import {
   chipPitch,
-  diffSeatBets,
   planChipTokens,
   snapshotSeatBets,
   type SeatBets,
@@ -42,9 +41,16 @@ import {
 } from './showdown';
 import { CountdownRing } from './CountdownRing';
 import { WinCelebration } from './WinCelebration';
-import { formatChips, handCounts, potOdds, streetLabel } from './feltStats';
+import { AllInMark } from './AllInMark';
+import { actionLabel, collectedPot, formatChips, handCounts, potOdds, streetLabel } from './feltStats';
 
 type ActionName = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
+
+/** A player's most recent action, floated over their seat for a moment. */
+export type SeatActionEvent = { seat: number; action: PlayerActionName; amount: number; id: number };
+type ActionFloat = { label: string; key: number };
+/** How long an action bubble lingers over a seat. */
+const ACTION_FLOAT_MS = 1600;
 
 type PendingConfirm = 'fold' | 'all-in' | 'amount' | null;
 
@@ -71,11 +77,13 @@ export function FeltView({
   state,
   playerId,
   lastAction,
+  lastActionEvent,
   nextHandSlot,
   onAction,
   onGoToLobby,
   onOpenThemes,
   onSwitchView,
+  onKick,
   onRebuy,
   autoNextHand = true,
   onAutoNextHand,
@@ -83,12 +91,15 @@ export function FeltView({
   state: PublicRoomState;
   playerId: string;
   lastAction: string | null;
+  /** Latest seat action, to float a bubble over that seat. */
+  lastActionEvent?: SeatActionEvent | null;
   /** Between hands this replaces the hole cards entirely (see isBetweenHands). */
   nextHandSlot?: ReactNode;
   onAction: (action: ActionName, amount?: number) => void;
   onGoToLobby: () => void;
   onOpenThemes: () => void;
   onSwitchView: () => void;
+  onKick: (playerId: string) => void;
   onRebuy?: () => void;
   autoNextHand?: boolean;
   onAutoNextHand?: (on: boolean) => void;
@@ -137,6 +148,10 @@ export function FeltView({
   const result = state.lastResult;
   const myPayout = result && mySeat !== null ? (result.payouts[mySeat] ?? 0) : 0;
   const celebrating = Boolean(result && handOver && (hand?.phase === 'COMPLETE' || result));
+  // Live, the center only holds chips already collected — this round's bets ride
+  // beside each seat until the street sweeps them in. At showdown the pot is whole
+  // again, so the win animation still flies the full amount.
+  const shownPotTotal = celebrating ? potTotal : collectedPot(potTotal, state.players);
   const [credited, setCredited] = useState(0);
   const creditToken = useRef<string | null>(null);
 
@@ -193,6 +208,7 @@ export function FeltView({
   const betFlights = useChipFlights();
   const prevBets = useRef<SeatBets>({});
   const betsHandId = useRef<string | null>(null);
+  const prevPhase = useRef<string | null>(null);
 
   const registerSeat = useCallback((seat: number, el: HTMLElement | null) => {
     if (el) seatRefs.current.set(seat, el);
@@ -205,33 +221,46 @@ export function FeltView({
   );
 
   const launchBetFlights = betFlights.launch;
+  // Bets ride as chips beside each seat through a betting round; when the street
+  // changes they sweep into the pot together (a real table collecting), instead
+  // of one flight per bet. The number under the pot grows at that same moment.
   useEffect(() => {
     const nextBets = snapshotSeatBets(state.players);
     const handId = hand?.handId ?? null;
+    const phase = hand?.phase ?? null;
 
-    // A new hand (or the first snapshot) is a baseline, never a round of bets.
+    // A new hand (or the first snapshot) is a baseline, never a collection.
     if (betsHandId.current !== handId) {
       betsHandId.current = handId;
+      prevBets.current = nextBets;
+      prevPhase.current = phase;
+      return;
+    }
+
+    const streetChanged = prevPhase.current !== phase;
+    prevPhase.current = phase;
+    if (!streetChanged) {
       prevBets.current = nextBets;
       return;
     }
 
-    const deltas = diffSeatBets(prevBets.current, nextBets);
+    // Street advanced: collect the bets that were live in the street just ended.
+    const sweeping = prevBets.current;
     prevBets.current = nextBets;
-    if (deltas.length === 0) return;
-
     const pot = centerOf(potRef.current);
     if (!pot) return;
 
-    for (const { seat, delta } of deltas) {
-      const from =
-        seat === mySeat ? centerOf(stackTargetRef.current) : seatTarget(seat);
+    let swept = false;
+    for (const [key, amount] of Object.entries(sweeping)) {
+      if (!amount) continue;
+      const seat = Number(key);
+      const from = seat === mySeat ? centerOf(stackTargetRef.current) : seatTarget(seat);
       if (!from) continue;
 
-      const tokens = planChipTokens(delta, { max: 6, staggerMs: 55 });
+      const tokens = planChipTokens(amount, { max: 6, staggerMs: 55 });
       if (tokens.length === 0) continue;
 
-      playChip('slide', { gain: 0.9 });
+      swept = true;
       launchBetFlights({
         from,
         to: pot,
@@ -239,7 +268,34 @@ export function FeltView({
         onChipLand: (i) => playChip('place', { pitch: chipPitch(i) }),
       });
     }
-  }, [state.players, hand?.handId, mySeat, seatTarget, launchBetFlights, playChip]);
+    if (swept) playChip('slide', { gain: 0.9 });
+  }, [state.players, hand?.handId, hand?.phase, mySeat, seatTarget, launchBetFlights, playChip]);
+
+  // --- Action bubbles floated over the seat that just acted. ---
+  const [actionFloats, setActionFloats] = useState<Map<number, ActionFloat>>(new Map());
+  useEffect(() => {
+    if (!lastActionEvent) return;
+    const { seat, action, id } = lastActionEvent;
+    setActionFloats((prev) => {
+      const next = new Map(prev);
+      next.set(seat, { label: actionLabel(action), key: id });
+      return next;
+    });
+    const t = window.setTimeout(() => {
+      setActionFloats((prev) => {
+        // Leave a newer bubble for this seat alone.
+        if (prev.get(seat)?.key !== id) return prev;
+        const next = new Map(prev);
+        next.delete(seat);
+        return next;
+      });
+    }, ACTION_FLOAT_MS);
+    return () => window.clearTimeout(t);
+  }, [lastActionEvent]);
+  // A fresh hand wipes any lingering bubbles.
+  useEffect(() => {
+    setActionFloats(new Map());
+  }, [hand?.handId]);
 
   // --- Zone: hole cards (tap or drag-x → flip). ---
   const holeZoneRef = useRef<HTMLDivElement>(null);
@@ -326,6 +382,8 @@ export function FeltView({
     return map;
   }, [showdownRows]);
   const resultText = result ? describeWinnerHeadline(showdownRows, result, state.players) : '';
+  const myShowdown = mySeat !== null ? showdownBySeat.get(mySeat) : undefined;
+  const myFloat = mySeat !== null ? actionFloats.get(mySeat) : undefined;
 
   const passive = passiveAction(toCall);
   const aggressive = minAggressiveAction({ currentBet, minRaise, bigBlind });
@@ -443,6 +501,7 @@ export function FeltView({
                   showdown={p.seat !== null ? showdownBySeat.get(p.seat) : undefined}
                   onSeatEl={registerSeat}
                   timer={hand?.currentToAct === p.seat ? turn : null}
+                  actionFloat={p.seat !== null ? actionFloats.get(p.seat) : undefined}
                 />
               ) : (
                 <li key={`L${i}`} className="felt-seat-slot" aria-hidden />
@@ -453,7 +512,7 @@ export function FeltView({
           <div className="felt-z2-center" ref={potRef}>
             <FeltPotDisplay
               pots={pots}
-              potTotal={potTotal}
+              potTotal={shownPotTotal}
               mySeat={mySeat}
               result={celebrating ? result : null}
               handId={hand?.handId}
@@ -478,6 +537,7 @@ export function FeltView({
                   showdown={p.seat !== null ? showdownBySeat.get(p.seat) : undefined}
                   onSeatEl={registerSeat}
                   timer={hand?.currentToAct === p.seat ? turn : null}
+                  actionFloat={p.seat !== null ? actionFloats.get(p.seat) : undefined}
                 />
               ) : (
                 <li key={`R${i}`} className="felt-seat-slot" aria-hidden />
@@ -511,13 +571,9 @@ export function FeltView({
             <span className="felt-turn-spacer" aria-hidden />
           )}
 
-          {iAmButton ? (
-            <span className="felt-dealer felt-dealer-me" title="Sos el dealer">
-              D
-            </span>
-          ) : (
-            <span className="felt-dealer-spacer" aria-hidden />
-          )}
+          {/* The dealer button now rides next to my avatar (see felt-hero-seat),
+              which frees this side of the strip for a taller hole-card area. */}
+          <span className="felt-dealer-spacer" aria-hidden />
         </div>
 
         {/*
@@ -526,15 +582,27 @@ export function FeltView({
           own stack is the last thing that should ever disappear.
         */}
         <div className="felt-hero-seat">
-          <CountdownRing
-            startedAt={isMyTurn ? turn?.startedAt : undefined}
-            timeoutMs={isMyTurn ? turn?.timeoutMs : undefined}
-            bankMs={turn?.bankMs}
-            size={40}
-            mine
-          >
-            <SeatAvatar token={me?.avatar} />
-          </CountdownRing>
+          <div className="felt-hero-id">
+            {myFloat ? (
+              <span key={myFloat.key} className="felt-action-float" role="status">
+                {myFloat.label}
+              </span>
+            ) : null}
+            <CountdownRing
+              startedAt={isMyTurn ? turn?.startedAt : undefined}
+              timeoutMs={isMyTurn ? turn?.timeoutMs : undefined}
+              bankMs={turn?.bankMs}
+              size={40}
+              mine
+            >
+              <SeatAvatar token={me?.avatar} />
+            </CountdownRing>
+            {iAmButton ? (
+              <span className="felt-dealer felt-dealer-me" title="Sos el dealer">
+                D
+              </span>
+            ) : null}
+          </div>
 
           <div ref={stackTargetRef} className="felt-stack-target zone-felt-stack">
             <ChipStackMini amount={stackShown} size="xs" className="felt-my-chips" />
@@ -549,6 +617,27 @@ export function FeltView({
               {formatChips(stackShown)}
             </motion.strong>
           </div>
+
+          {/* At hand end my cards read here, small, right beside my stack — the
+              same size my opponents show. Otherwise: live bet chip / all-in mark. */}
+          {myShowdown?.cards.length ? (
+            <span className="felt-seat-hole felt-hero-hole" aria-label="Tus cartas">
+              {myShowdown.cards.map((card, i) => (
+                <PlayingCard key={i} card={card} size="sm" halfScale={1.05} animate="reveal" />
+              ))}
+            </span>
+          ) : me?.status === 'ALL_IN' ? (
+            <span className="felt-seat-mark felt-seat-mark--allin" title="All-in">
+              <AllInMark size={18} />
+            </span>
+          ) : myBet > 0 ? (
+            <span className="felt-seat-bet-chip" aria-label={`Apuesta ${formatChips(myBet)}`}>
+              <ChipStackMini amount={myBet} size="xs" maxColumns={2} maxPerColumn={3} />
+              <span className="felt-seat-bet-amt">{formatChips(myBet)}</span>
+            </span>
+          ) : (
+            <span className="felt-hero-mark-spacer" aria-hidden />
+          )}
 
           <p className="felt-my-hand accent">{myHandName ?? '•••'}</p>
         </div>
@@ -695,11 +784,14 @@ export function FeltView({
 
                 <motion.button
                   type="button"
-                  className="custom"
+                  className="allin fire-fx"
                   disabled={!canAllIn}
                   whileTap={canAllIn ? { scale: 0.96 } : undefined}
                   onClick={() => fire('all-in')}
                 >
+                  <span className="allin-btn-mark" aria-hidden>
+                    <AllInMark size={18} />
+                  </span>
                   All-in
                 </motion.button>
               </div>
@@ -736,6 +828,7 @@ export function FeltView({
         onAutoNextHand={(on) => {
           onAutoNextHand?.(on);
         }}
+        onKick={onKick}
         onClose={() => {
           setMenuOpen(false);
           play('tick');
@@ -784,6 +877,7 @@ export function FeltView({
         message={`Vas a poner todo tu stack (${formatChips(stack)}) en el bote.`}
         confirmLabel="All-in"
         tone="warn"
+        accent="fire"
         onCancel={closeModal}
         onConfirm={confirmPending}
       />
@@ -799,6 +893,7 @@ function FeltSeatPill({
   showdown,
   onSeatEl,
   timer,
+  actionFloat,
 }: {
   player: PublicPlayer;
   /** Right rail: name first, then avatar (mirrors toward pot). */
@@ -811,6 +906,8 @@ function FeltSeatPill({
   onSeatEl?: (seat: number, el: HTMLElement | null) => void;
   /** Set only on the seat that is on the clock. */
   timer?: TurnClockProps | null;
+  /** A just-taken action, floated over the seat for a moment. */
+  actionFloat?: ActionFloat;
 }) {
   const folded = player.status === 'FOLDED';
   const revealing = Boolean(showdown?.cards.length);
@@ -837,13 +934,29 @@ function FeltSeatPill({
       </span>
     ) : null;
 
+  // Beside the name: the live bet as a chip, or the all-in triangle. Showdown
+  // seats show their result instead (below).
+  const marks = showdown ? null : player.status === 'ALL_IN' ? (
+    <span className="felt-seat-mark felt-seat-mark--allin" title="All-in">
+      <AllInMark size={16} />
+    </span>
+  ) : player.betThisRound ? (
+    <span className="felt-seat-bet-chip" aria-label={`Apuesta ${formatChips(player.betThisRound)}`}>
+      <ChipStackMini amount={player.betThisRound} size="xs" maxColumns={2} maxPerColumn={3} />
+      <span className="felt-seat-bet-amt">{formatChips(player.betThisRound)}</span>
+    </span>
+  ) : null;
+
   const info = (
     <div className="felt-seat-pill-info">
-      <span className="felt-seat-pill-name">
-        {acting ? '▸ ' : ''}
-        {player.displayName}
-        {isButton ? <span className="felt-dealer">D</span> : null}
-        {showdown?.isWinner ? <span className="felt-seat-win">WIN</span> : null}
+      <span className="felt-seat-name-row">
+        <span className="felt-seat-pill-name">
+          {acting ? '▸ ' : ''}
+          {player.displayName}
+          {isButton ? <span className="felt-dealer">D</span> : null}
+          {showdown?.isWinner ? <span className="felt-seat-win">WIN</span> : null}
+        </span>
+        {marks}
       </span>
       <span className="felt-seat-pill-stack">{formatChips(player.stack)}</span>
       {showdown ? (
@@ -853,12 +966,8 @@ function FeltSeatPill({
             <span className="felt-seat-pill-bet">+{formatChips(showdown.payout)}</span>
           ) : null}
         </>
-      ) : player.betThisRound ? (
-        <span className="felt-seat-pill-bet">{formatChips(player.betThisRound)}</span>
       ) : folded ? (
         <span className="felt-seat-pill-bet muted">Fold</span>
-      ) : player.status === 'ALL_IN' ? (
-        <span className="felt-seat-pill-bet">All-in</span>
       ) : null}
     </div>
   );
@@ -885,6 +994,11 @@ function FeltSeatPill({
         folded ? ' folded' : ''
       }${showdown?.isWinner ? ' is-winner' : ''}${revealing ? ' revealing' : ''}`}
     >
+      {actionFloat ? (
+        <span key={actionFloat.key} className="felt-action-float" role="status">
+          {actionFloat.label}
+        </span>
+      ) : null}
       {body}
     </li>
   );

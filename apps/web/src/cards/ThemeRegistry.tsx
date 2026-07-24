@@ -8,6 +8,7 @@ import {
 } from 'react';
 import type { CardTheme } from './CardTheme';
 import { defaultSvgTheme } from './DefaultSvgTheme';
+import { balatroSvgTheme } from './BalatroSvgTheme';
 import {
   createAssetCardTheme,
   type AssetThemeConfig,
@@ -77,7 +78,7 @@ function saveCustomConfigs(configs: AssetThemeConfig[]): void {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [builtin] = useState<CardTheme[]>([defaultSvgTheme]);
+  const [builtin] = useState<CardTheme[]>([defaultSvgTheme, balatroSvgTheme]);
   const [custom, setCustom] = useState<CardTheme[]>(() => loadCustomThemes());
   const [customConfigs, setCustomConfigs] = useState<AssetThemeConfig[]>(() => {
     try {
