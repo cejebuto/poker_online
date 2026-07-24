@@ -17,6 +17,11 @@ import { BetAmountModal } from './BetAmountModal';
 import { ConfirmModal } from './ConfirmModal';
 import { FeltMenuModal } from './FeltMenuModal';
 import { loadFeltTheme, resolveFeltTheme, saveFeltTheme } from './feltTheme';
+import {
+  loadHeroHandedness,
+  saveHeroHandedness,
+  type HeroHandedness,
+} from './heroHandedness';
 import { isBetweenHands } from './NextHandPrompt';
 import {
   canAffordTotal,
@@ -110,6 +115,7 @@ export function FeltView({
   const [pending, setPending] = useState<PendingConfirm>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [feltTheme, setFeltTheme] = useState(() => loadFeltTheme());
+  const [actionsSide, setActionsSide] = useState<HeroHandedness>(() => loadHeroHandedness());
   const stackTargetRef = useRef<HTMLDivElement>(null);
   const hand = state.hand;
   const me = state.players.find((p) => p.playerId === playerId);
@@ -448,6 +454,7 @@ export function FeltView({
   return (
     <section
       className={`felt${isMyTurn ? ' my-turn' : ''}`}
+      data-actions={actionsSide}
       style={
         { '--felt-green': feltTheme.green, '--felt-dark': feltTheme.dark } as CSSProperties
       }
@@ -833,6 +840,7 @@ export function FeltView({
         playerId={playerId}
         feltThemeId={feltTheme.id}
         equityOn={equityOn}
+        actionsSide={actionsSide}
         autoNextHand={autoNextHand}
         onFeltTheme={(id) => {
           setFeltTheme(resolveFeltTheme(id));
@@ -841,6 +849,10 @@ export function FeltView({
         onEquity={(on) => {
           setEquityOn(on);
           saveEquityEnabled(on);
+        }}
+        onActionsSide={(side) => {
+          setActionsSide(side);
+          saveHeroHandedness(side);
         }}
         onAutoNextHand={(on) => {
           onAutoNextHand?.(on);

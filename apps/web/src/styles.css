@@ -3287,11 +3287,10 @@ select {
   padding: 0.4rem 0.45rem 0.5rem;
   display: grid;
   /*
-   * Hero (Z3) is always side-by-side (cards | actions), so it needs less
-   * vertical budget than a stacked action bar. Extra height goes to Z2
-   * (mesa / oponentes). Tall viewports bump Z2 further below.
+   * Z1 and Z3 size to their content so the action bar is never clipped.
+   * Z2 (mesa / oponentes) absorbs all leftover height.
    */
-  grid-template-rows: minmax(0, 2fr) minmax(0, 4.6fr) minmax(0, 3.4fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0.35rem;
   color: #e6f2ec;
   isolation: isolate;
@@ -3302,6 +3301,10 @@ select {
 .felt-z3 {
   min-height: 0;
   min-width: 0;
+}
+
+.felt-z1,
+.felt-z2 {
   overflow: hidden;
 }
 
@@ -3640,6 +3643,9 @@ select {
   flex-direction: column;
   gap: 0.2rem;
   min-height: 0;
+  /* Content-sized row in the felt grid; must not clip the action bar. */
+  overflow: visible;
+  flex-shrink: 0;
 }
 
 /* Only mounts when it is my turn — no ghost height when idle. */
@@ -3665,16 +3671,18 @@ select {
 }
 
 /*
- * Always side-by-side: hole cards left, action bar right.
- * (Previously only under max-height: 700px — tall Safari stacked buttons
- * under tiny cards while short Brave looked correct.)
+ * Always side-by-side: hole cards | action bar (default right).
+ * data-actions="left" on .felt flips via row-reverse (see below).
+ *
+ * No negative-margin "climb": it shrank flex outer height and clipped All-in
+ * under overflow:hidden. Action bar height drives the row; cards scale to match.
  */
 .felt-z3-body {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 0.35rem;
 }
 
@@ -3695,9 +3703,9 @@ select {
   flex: 1 1 56%;
   min-width: 0;
   min-height: 0;
-  display: flex;
-  /* Stretch the card stage; cards stay slightly lower than the live bet. */
+  /* Match action column height so container queries scale cards, not buttons. */
   align-self: stretch;
+  display: flex;
   align-items: flex-start;
   justify-content: center;
   margin: 0;
@@ -3885,18 +3893,12 @@ select {
 
 .felt-z3 .felt-actionbar {
   flex: 0 0 44%;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   margin: 0;
   padding: 0;
-  padding-top: 0;
-  /*
-   * Climb into the empty right half of the hero-seat row so Equity / Pot odds
-   * sit high (level with the live-bet slot), separate from the lowered hole cards.
-   * Offset stays stable because the bet slot always reserves height.
-   */
-  margin-top: -2.65rem;
   background: transparent;
   border: none;
   justify-content: flex-start;
@@ -3937,7 +3939,7 @@ select {
 
 .felt-z3 .felt-buttons button {
   min-width: 0;
-  min-height: 2.35rem;
+  min-height: 2.2rem;
   padding: 0.3rem 0.15rem;
   font-size: 0.72rem;
   border-radius: 0.55rem;
@@ -5733,32 +5735,39 @@ select {
 }
 
 /*
- * Tall viewports (e.g. Safari with more chrome room): keep the same
- * cards-left / actions-right hero layout, give Z2 more height, and open
- * margins slightly so the extra space doesn't stack the action bar under cards.
+ * Handedness: default actions on the right. data-actions="left" flips the
+ * hero column (buttons left; cards + avatar + stack + bet right).
  */
+.felt[data-actions='left'] .felt-z3-body {
+  flex-direction: row-reverse;
+}
+
+.felt[data-actions='left'] .felt-hero-seat {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  direction: rtl;
+}
+
+.felt[data-actions='left'] .felt-hero-seat > * {
+  direction: ltr;
+}
+
+.felt[data-actions='left'] .felt-hero-seat > .felt-seat-mark,
+.felt[data-actions='left'] .felt-hero-seat > .felt-hero-hole {
+  justify-self: end;
+}
+
+/* Tall phones: a little more air; never shrink Z3 or grow button min-height. */
 @media (min-height: 701px) {
   .felt {
-    grid-template-rows: minmax(0, 2fr) minmax(0, 5fr) minmax(0, 3fr);
     gap: 0.45rem;
     padding: 0.5rem 0.55rem 0.6rem;
   }
 
   .felt-z3-body {
-    gap: 0.5rem;
+    gap: 0.45rem;
   }
 
   .felt-z3 .felt-hole {
     padding-top: 0.65rem;
-  }
-
-  .felt-z3 .felt-buttons {
-    gap: 0.35rem;
-  }
-
-  .felt-z3 .felt-buttons button {
-    min-height: 2.5rem;
-    padding: 0.35rem 0.2rem;
-    font-size: 0.74rem;
   }
 }

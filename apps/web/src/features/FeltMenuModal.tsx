@@ -5,6 +5,7 @@ import { useJuice } from '../juice/useJuice';
 import { formatChips } from './feltStats';
 import { canKickFromTable } from './kickEligibility';
 import { useCopy } from './useCopy';
+import type { HeroHandedness } from './heroHandedness';
 import { ThemePicker } from './ThemePicker';
 
 export type FeltMenuModalProps = {
@@ -13,10 +14,13 @@ export type FeltMenuModalProps = {
   playerId: string;
   feltThemeId: string;
   equityOn: boolean;
+  /** Which side holds Fold/Check/Raise — default right. */
+  actionsSide: HeroHandedness;
   /** Host: auto-start next hand ~2s after the first. */
   autoNextHand: boolean;
   onFeltTheme: (id: string) => void;
   onEquity: (on: boolean) => void;
+  onActionsSide: (side: HeroHandedness) => void;
   onAutoNextHand: (on: boolean) => void;
   onKick: (playerId: string) => void;
   onClose: () => void;
@@ -37,9 +41,11 @@ export function FeltMenuModal({
   playerId,
   feltThemeId,
   equityOn,
+  actionsSide,
   autoNextHand,
   onFeltTheme,
   onEquity,
+  onActionsSide,
   onAutoNextHand,
   onKick,
   onClose,
@@ -207,6 +213,22 @@ export function FeltMenuModal({
                 }}
               >
                 {equityOn ? '📊 Equity visible' : '📊 Equity oculta'}
+              </button>
+              <button
+                type="button"
+                className="ghost small"
+                aria-pressed={actionsSide === 'left'}
+                aria-label={
+                  actionsSide === 'right'
+                    ? 'Botones de acción a la derecha'
+                    : 'Botones de acción a la izquierda'
+                }
+                onClick={() => {
+                  onActionsSide(actionsSide === 'right' ? 'left' : 'right');
+                  play('tick');
+                }}
+              >
+                {actionsSide === 'right' ? '↔️ Botones a la derecha' : '↔️ Botones a la izquierda'}
               </button>
               <button type="button" className="ghost small" onClick={onSwitchView}>
                 Vista clásica
