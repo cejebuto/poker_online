@@ -7,6 +7,8 @@ export type ClientSession = {
   playerId?: string;
   roomId?: string;
   role?: 'host' | 'player' | 'mesa';
+  /** Set after `presence:hello` — counts as a registered app user. */
+  displayName?: string;
 };
 
 class Hub {
@@ -68,9 +70,30 @@ class Hub {
     }
   }
 
+  /** Connections that sent `presence:hello` (pseudonym chosen). */
+  countPresent(): number {
+    let n = 0;
+    for (const s of this.connections.values()) {
+      if (s.displayName) n += 1;
+    }
+    return n;
+  }
+
+  /** Fan-out to every open socket (lobby presence, etc.). */
+  broadcastAll(event: WsServerEvent): void {
+    for (const s of this.connections.values()) {
+      this.send(s.connectionId, event);
+    }
+  }
+
   /** All events sent (for tests). */
   dumpOpenConnectionCount(): number {
     return this.connections.size;
+  }
+
+  /** Test helper — drop every connection. */
+  _clearForTests(): void {
+    this.connections.clear();
   }
 }
 

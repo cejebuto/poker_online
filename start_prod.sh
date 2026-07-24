@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # One-shot production launcher (Caddy TLS on :80/:443).
 #
+# Thin wrapper around `./start.sh prod` — same Dockerfiles as local, but with
+# docker-compose.prod.yml + .env.production + Caddy. Public surface is only
+# 80/443; poker and roulette WebSockets stay internal:
+#   wss://<domain>/ws        → api:3001
+#   wss://<domain>/roulette  → api:3002  (never published on the host)
+#
 # Usage:
 #   ./start_prod.sh                          # domain from DOMAIN env or .env.production
 #                                            # default: juegapoker.online
@@ -10,6 +16,8 @@
 #   ./start_prod.sh --reset-db               # DESTROYS DB volume, then starts
 #
 # Requires Docker. See docs/deploy.md (Cloudflare, WEB_ORIGIN, backups).
+# Do not `docker compose … --scale api=2` while roulette is in-memory on each
+# process — sticky routing is not configured.
 set -euo pipefail
 
 cd "$(dirname "$0")"

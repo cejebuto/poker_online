@@ -25,7 +25,11 @@ Or with the one-shot helper (generates `.env.production` if missing; default dom
 
 - HTTPS/WSS via **Caddy** (`deploy/Caddyfile`)
 - API runs migrations on container start (`prisma migrate deploy`)
-- Web is nginx static SPA; Caddy routes `/ws`, `/health`, `/metrics`, `/rooms/*` → api
+- Web is nginx static SPA; Caddy routes:
+  - `/health`, `/metrics`, `/rooms/*` → `api:3001`
+  - `/ws` (poker) → `api:3001`
+  - `/roulette` (roulette WS) → `api:3002` (second listener in the same api container)
+- Host ports in prod: **only 80/443**. `3001` / `3002` stay on the Docker network.
 
 ### Env vars that control public URLs
 
@@ -34,6 +38,7 @@ Or with the one-shot helper (generates `.env.production` if missing; default dom
 | `WEB_ORIGIN` | CORS + **invite links** (`joinUrl` / QR). Must match what users type in the browser, e.g. `https://juegapoker.online` |
 | `SITE_ADDRESS` | Hostname (or `http://host`) Caddy uses for TLS / binding |
 | `VITE_WS_URL` | Leave **empty** in Docker. The SPA uses same-origin `wss://<host>/ws` |
+| `ROULETTE_PORT` | Internal only (default `3002`). Browser uses `wss://<host>/roulette` via Caddy — never open this on the public firewall |
 
 Local (`.env`) keeps `WEB_ORIGIN=http://localhost:8088`. Production (`.env.production`) uses the real domain. No code change is required to switch links: they are built from `WEB_ORIGIN` on the API.
 
@@ -43,7 +48,9 @@ Local (`.env`) keeps `WEB_ORIGIN=http://localhost:8088`. Production (`.env.produ
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --scale api=2
 ```
 
-Redis pub/sub keeps room events consistent across instances.
+Redis pub/sub keeps **poker** room events consistent across instances.
+
+**Do not scale api while roulette is active** without sticky sessions: the roulette table is in-memory per process, and Caddy load-balances `/roulette` across replicas.
 
 ### Health & metrics
 
@@ -137,6 +144,7 @@ Open the site in a phone browser: status **conectado**, create a room, copy link
 |---------|--------|
 | 522 / 521 from Cloudflare | Origin down or ports 80/443 closed; `docker compose … ps` |
 | Web loads, WS fails | Cloudflare WebSockets on; Caddy `/ws` → api; browser uses `wss://` same host |
+| Roulette UI connects then drops | Caddy `/roulette` → `api:3002`; api logs show `[roulette] listening`; do not scale api |
 | Invite link is localhost | API still has old `WEB_ORIGIN` — restart api with `.env.production` |
 | Certificate errors (Full strict) | Wait for Caddy LE; `docker compose … logs caddy`; temporarily use Full |
 | CORS / blocked API | `WEB_ORIGIN` must be exactly `https://juegapoker.online` (no trailing slash) |
@@ -151,7 +159,7 @@ Open the site in a phone browser: status **conectado**, create a room, copy link
 | Compose | `docker-compose.yml` | `docker-compose.prod.yml` |
 | Env file | `.env` | `.env.production` |
 | TLS | optional | Caddy (+ Cloudflare edge) |
-| Ports | 8088 / 3001 / 5433 | 80 / 443 only |
+| Ports | 8088 / 3001 / 3002 / 5433 | 80 / 443 only (api 3001+3002 internal) |
 | `WEB_ORIGIN` | `http://localhost:8088` | `https://juegapoker.online` |
 | Logs | debug-friendly | info (structured JSON) |
 

@@ -1,0 +1,406 @@
+/* Roulette — its own stylesheet, every class prefixed `rlt-`. No poker styles. */
+
+.rlt {
+  --rlt-gold: #caa94b;
+  --rlt-red: #d8352a;
+  --rlt-black: #14181f;
+  --rlt-green: #128a4b;
+  --rlt-panel: rgba(6, 20, 14, 0.72);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 34rem;
+  margin: 0 auto;
+  /* Full viewport shell: stage pinned, bets scroll. */
+  height: 100dvh;
+  height: 100vh;
+  max-height: 100dvh;
+  max-height: 100vh;
+  padding: 0.45rem 0.6rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: #eaf5ee;
+  background: radial-gradient(circle at 50% -5%, #123a2a 0%, #08160f 62%, #050d09 100%);
+  overflow: hidden;
+}
+
+.rlt * {
+  box-sizing: border-box;
+}
+
+/* Wheel + chrome stay visible; never leave the viewport. */
+.rlt-stage {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+  z-index: 2;
+  background: radial-gradient(circle at 50% -5%, #123a2a 0%, #08160f 70%, #050d09 100%);
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid rgba(202, 169, 75, 0.18);
+}
+
+/* Bet felt gets the leftover height (+5pp vs previous wheel-heavy layout). */
+.rlt-bets-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.35rem 0 max(1.1rem, env(safe-area-inset-bottom));
+}
+
+/* —— Header —— */
+.rlt-top {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.rlt-back {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.28);
+  color: #dfeee5;
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rlt-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-self: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #cfe6d8;
+}
+.rlt-phase-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--rlt-gold);
+}
+.rlt-phase--betting .rlt-phase-dot {
+  background: #43d17a;
+  box-shadow: 0 0 8px #43d17a99;
+}
+.rlt-phase--spinning .rlt-phase-dot {
+  background: #f0c14b;
+  animation: rlt-pulse 0.7s ease-in-out infinite;
+}
+.rlt-phase--payout .rlt-phase-dot {
+  background: #58b0f0;
+}
+.rlt-balance {
+  justify-self: end;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--rlt-gold);
+  font-size: 1rem;
+}
+
+/* —— 3D wheel (≈ −5% vs prior stage height so bets gain room) —— */
+.rlt-wheel {
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* Was min(44vh, 320px) → ~5% less for the stage. */
+  height: min(41.8vh, 304px);
+  perspective: 900px;
+  perspective-origin: 50% 30%;
+  flex-shrink: 0;
+}
+.rlt-wheel-tilt {
+  position: relative;
+  /* Match the stage shrink so the disc stays proportional. */
+  width: min(72vw, 275px);
+  height: min(72vw, 275px);
+  transform: rotateX(52deg);
+  transform-style: preserve-3d;
+  border-radius: 50%;
+  box-shadow:
+    0 24px 40px rgba(0, 0, 0, 0.55),
+    0 0 0 8px #1a120a,
+    0 0 0 11px var(--rlt-gold);
+}
+.rlt-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transition: transform 6s cubic-bezier(0.08, 0.72, 0.12, 1);
+  will-change: transform;
+}
+.rlt-disc-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.rlt-ball-orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transition: transform 6.2s cubic-bezier(0.1, 0.68, 0.12, 1);
+  will-change: transform;
+  pointer-events: none;
+}
+.rlt-ball {
+  position: absolute;
+  top: 4.5%;
+  left: 50%;
+  width: 6.5%;
+  height: 6.5%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #c8ccd2 55%, #8a9099);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.rlt-wheel-pointer {
+  position: absolute;
+  top: 2%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 0.5rem solid transparent;
+  border-right: 0.5rem solid transparent;
+  border-top: 0.8rem solid var(--rlt-gold);
+  z-index: 3;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+.rlt-wheel-badge {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.2rem;
+  min-width: 2rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.5rem;
+  font-weight: 800;
+  text-align: center;
+  border: 1px solid var(--rlt-gold);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* —— History strip —— */
+.rlt-history {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+  scrollbar-width: thin;
+}
+.rlt-hist {
+  flex: 0 0 auto;
+  min-width: 1.5rem;
+  padding: 0.12rem 0.3rem;
+  border-radius: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+  color: #fff;
+}
+
+/* —— Result banner —— */
+.rlt-result {
+  text-align: center;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.6rem;
+  background: var(--rlt-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.rlt-result.is-win {
+  border-color: var(--rlt-gold);
+  color: #ffe9a8;
+  box-shadow: 0 0 0 1px rgba(202, 169, 75, 0.4);
+}
+
+/* —— Chip rail —— */
+.rlt-chiprail {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.rlt-chip {
+  min-width: 3.1rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 999px;
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  background: #1c2b22;
+  color: #f2f7f3;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.rlt-chip:disabled {
+  opacity: 0.35;
+}
+.rlt-chip.is-selected {
+  border-style: solid;
+  border-color: var(--rlt-gold);
+  background: #2a3d30;
+  box-shadow: 0 0 0 2px rgba(202, 169, 75, 0.35);
+  transform: translateY(-1px);
+}
+
+/* —— Board —— */
+.rlt-board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+.rlt-zeros,
+.rlt-colbets,
+.rlt-dozens {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.3rem;
+}
+/* 0 / 00 stay on their own 2-wide strip. */
+.rlt-zeros {
+  grid-template-columns: repeat(2, 1fr);
+}
+/* 1–36: four columns so the felt is denser and shorter to scroll. */
+.rlt-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.28rem;
+}
+.rlt-outside {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.3rem;
+}
+
+.rlt-spot {
+  position: relative;
+  min-height: 2.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.45rem;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  background: #223; /* overridden by color classes */
+  touch-action: manipulation;
+}
+.rlt-grid .rlt-spot {
+  min-height: 2.5rem;
+  font-size: 0.92rem;
+}
+.rlt-spot:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.rlt-outside-btn {
+  background: #123122;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+}
+.rlt-color-red {
+  background: var(--rlt-red);
+}
+.rlt-color-black {
+  background: var(--rlt-black);
+}
+.rlt-color-green {
+  background: var(--rlt-green);
+}
+.rlt-spot-chip {
+  position: absolute;
+  bottom: 0.12rem;
+  right: 0.2rem;
+  padding: 0.02rem 0.3rem;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #08130d;
+  background: linear-gradient(180deg, #ffe9a8, var(--rlt-gold));
+  font-variant-numeric: tabular-nums;
+}
+
+/* —— Actions / players / status —— */
+.rlt-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.rlt-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.3);
+  color: #e6f2ea;
+  border-radius: 0.55rem;
+  padding: 0.5rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rlt-btn:disabled {
+  opacity: 0.4;
+}
+.rlt-btn--gold {
+  background: linear-gradient(180deg, #ffe9a8, var(--rlt-gold));
+  color: #1a1206;
+  border-color: transparent;
+}
+.rlt-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+}
+.rlt-player {
+  font-size: 0.72rem;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  background: var(--rlt-panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.rlt-player.is-off {
+  opacity: 0.45;
+}
+.rlt-error {
+  margin: 0;
+  text-align: center;
+  color: #fca5a5;
+  font-weight: 700;
+}
+.rlt-conn {
+  margin: 0;
+  text-align: center;
+  color: #9fb3a8;
+  font-size: 0.78rem;
+}
+
+@keyframes rlt-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rlt-disc,
+  .rlt-ball-orbit {
+    transition: none;
+  }
+  .rlt-phase--spinning .rlt-phase-dot {
+    animation: none;
+  }
+}

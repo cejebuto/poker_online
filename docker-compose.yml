@@ -32,12 +32,15 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 3001
+      ROULETTE_PORT: ${ROULETTE_PORT:-3002}
       DATABASE_URL: postgresql://${POSTGRES_USER:-poker}:${POSTGRES_PASSWORD:-poker}@postgres:5432/${POSTGRES_DB:-poker}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8088}
     ports:
       - "${API_PORT:-3001}:3001"
+      # Local only: handy to hit roulette without the web proxy. Prod does not publish this.
+      - "${ROULETTE_PORT:-3002}:3002"
     depends_on:
       postgres:
         condition: service_healthy

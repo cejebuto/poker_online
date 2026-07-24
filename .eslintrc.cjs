@@ -72,5 +72,28 @@ module.exports = {
       files: ['apps/web/**/*.{ts,tsx}'],
       env: { browser: true },
     },
+    {
+      // The roulette is a self-contained island: it must never reach into poker
+      // code, so it can be lifted out to another project untouched. Enforced, not
+      // just documented.
+      files: ['apps/*/src/roulette/**/*.{ts,tsx}', 'packages/roulette/**/*.ts'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              '@poker/*',
+              '**/features/*',
+              '**/domain/*',
+              '**/ws/*',
+              '**/cards/*',
+              '**/chips/*',
+              '**/juice/*',
+              '**/probability/*',
+            ],
+          },
+        ],
+      },
+    },
   ],
 };

@@ -40,6 +40,16 @@
 		}
 	}
 
+	# Roulette WS (own process/port inside the api container)
+	handle /roulette {
+		reverse_proxy api:3002 {
+			transport http {
+				read_timeout 3600s
+				write_timeout 3600s
+			}
+		}
+	}
+
 	# SPA + static (nginx inside web container)
 	handle {
 		reverse_proxy web:80

@@ -43,7 +43,8 @@ body {
 .app-home,
 .app-create,
 .app-lobby,
-.app-join {
+.app-join,
+.app-roulette {
   width: 100%;
   max-width: none;
   min-height: 100dvh;
@@ -52,12 +53,22 @@ body {
   padding: 0;
 }
 
+/* Roulette owns its own sticky stage + scroll; clip the shell to the phone. */
+.app-roulette {
+  height: 100dvh;
+  height: 100vh;
+  max-height: 100dvh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
 /* When felt shells are active, root loses default padding so the felt fills the phone. */
 #root:has(.app-gate),
 #root:has(.app-home),
 #root:has(.app-create),
 #root:has(.app-lobby),
-#root:has(.app-join) {
+#root:has(.app-join),
+#root:has(.app-roulette) {
   padding: 0;
   place-items: stretch;
   min-height: 100dvh;
@@ -114,6 +125,14 @@ body {
   color: #fecaca;
 }
 
+.gate-top-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
 .gate-brand {
   margin: 0;
   font-size: 0.68rem;
@@ -121,6 +140,26 @@ body {
   letter-spacing: 0.14em;
   color: var(--gate-gold);
   text-align: right;
+}
+
+.active-users {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(215, 228, 215, 0.72);
+  white-space: nowrap;
+}
+
+.active-users-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: #5dce7a;
+  box-shadow: 0 0 0 2px rgba(93, 206, 122, 0.18);
+  flex-shrink: 0;
 }
 
 .gate-card {
@@ -697,6 +736,14 @@ button.small {
   color: #fecaca;
 }
 
+.home-top-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
 .home-brand {
   margin: 0;
   font-size: 0.68rem;
@@ -723,6 +770,13 @@ button.small {
   gap: 0.55rem;
 }
 
+.home-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
 .home-title {
   margin: 0;
   font-family: Georgia, 'Times New Roman', ui-serif, serif;
@@ -731,6 +785,24 @@ button.small {
   letter-spacing: -0.02em;
   line-height: 1.15;
   color: #f7f3ea;
+}
+
+/* Right of the title: the door into the (separate) roulette. */
+.home-roulette-btn {
+  flex: none;
+  align-self: flex-start;
+  border: 1px solid rgba(201, 168, 74, 0.55);
+  background: linear-gradient(180deg, rgba(201, 168, 74, 0.22), rgba(201, 168, 74, 0.08));
+  color: #f2e6c0;
+  border-radius: 999px;
+  padding: 0.34rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.home-roulette-btn:active {
+  transform: scale(0.96);
 }
 
 .home-sub {
@@ -3208,7 +3280,7 @@ select {
   justify-content: center;
 }
 
-/* ---- Felt view: 3-zone phone layout (20% / 40% / 40%) ---- */
+/* ---- Felt view: 3-zone phone layout (~20% / ~37% / ~43%) ---- */
 
 .felt {
   --felt-green: #14663f;
@@ -3239,10 +3311,10 @@ select {
   padding: 0.4rem 0.45rem 0.5rem;
   display: grid;
   /*
-   * Z3 carries my seat strip on top of the cards and the action bar, and Z2 is
-   * mostly empty felt between the rails — so the hero zone gets the extra room.
+   * Z2 (mesa / oponentes) gets a little more height (+3pp) taken from Z3
+   * hero (−3pp). Baseline was 2 / 3.4 / 4.6.
    */
-  grid-template-rows: minmax(0, 2fr) minmax(0, 3.4fr) minmax(0, 4.6fr);
+  grid-template-rows: minmax(0, 2fr) minmax(0, 3.7fr) minmax(0, 4.3fr);
   gap: 0.35rem;
   color: #e6f2ec;
   isolation: isolate;
@@ -3788,6 +3860,9 @@ select {
  * Live bet stays high (toward the pot). Stack + avatar sit lower with the
  * hole cards — the gap is the deliberate separation between "what I put in"
  * and "what I still have / who I am".
+ *
+ * The bet *slot* is always mounted (even with 0 bet) so posting chips never
+ * reflows Z3. Height covers ChipStackMini xs + amount OR AllInBadge md.
  */
 .felt-hero-stack {
   position: relative;
@@ -3795,6 +3870,16 @@ select {
   flex-direction: column;
   align-items: center;
   gap: 1.15rem;
+}
+
+.felt-hero-bet-slot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex-shrink: 0;
+  /* Tall enough for badge md / stacked bet chips + amount label. */
+  min-height: 1.75rem;
+  min-width: 2.5rem;
 }
 
 .felt-hero-bet {
@@ -5647,7 +5732,8 @@ select {
   }
   /*
    * Climb into the empty right half of the hero-seat row so Equity / Pot odds
-   * sit high (level with the live bet), separate from the lowered hole cards.
+   * sit high (level with the live-bet slot), separate from the lowered hole cards.
+   * Offset stays stable because the bet slot always reserves height.
    */
   .felt-z3-body .felt-actionbar {
     flex: 0 0 44%;

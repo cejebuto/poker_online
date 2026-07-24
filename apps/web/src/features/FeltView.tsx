@@ -69,10 +69,11 @@ const HOLE_DEAL_STAGGER_MS = 120;
  *
  * felt
  * ├── Z1 cartas (~20%)     street + community + menu + timer
- * ├── Z2 oponentes (~40%)  left 4 | pot | right 4 (+ showdown scroll)
- * └── Z3 mi zona (~40%)    hole (drag-x flip) + stack + actions
+ * ├── Z2 oponentes (~37%)  left 4 | pot | right 4 (+ showdown scroll)
+ * └── Z3 mi zona (~43%)    hole (drag-x flip) + stack + actions
  *
  * Logic (actions, pot credit, equity, modals) is unchanged; only layout moves.
+ * Hero live-bet slot always reserves height so posting chips never reflows Z3.
  */
 export function FeltView({
   state,
@@ -588,16 +589,30 @@ export function FeltView({
             ) : null}
           </div>
 
-          {/* Stack pill; live bet or a loud ALL-IN badge sits above it. */}
+          {/*
+            Stack pill under a always-reserved live-bet slot. The slot keeps a
+            fixed height even with no bet so posting chips never shoves the
+            hole cards / action bar down (layout jump on mobile).
+          */}
           <div className="felt-hero-stack">
-            {!myShowdown?.cards.length && me?.status === 'ALL_IN' ? (
-              <AllInBadge amount={myBet} size="md" className="felt-hero-bet" />
-            ) : !myShowdown?.cards.length && myBet > 0 ? (
-              <span className="felt-seat-bet-chip felt-hero-bet" aria-label={`Apuesta ${formatChips(myBet)}`}>
-                <ChipStackMini amount={myBet} size="xs" maxColumns={2} maxPerColumn={3} />
-                <span className="felt-seat-bet-amt">{formatChips(myBet)}</span>
-              </span>
-            ) : null}
+            <div
+              className="felt-hero-bet-slot"
+              aria-hidden={
+                Boolean(myShowdown?.cards.length) || (me?.status !== 'ALL_IN' && myBet <= 0)
+              }
+            >
+              {!myShowdown?.cards.length && me?.status === 'ALL_IN' ? (
+                <AllInBadge amount={myBet} size="md" className="felt-hero-bet" />
+              ) : !myShowdown?.cards.length && myBet > 0 ? (
+                <span
+                  className="felt-seat-bet-chip felt-hero-bet"
+                  aria-label={`Apuesta ${formatChips(myBet)}`}
+                >
+                  <ChipStackMini amount={myBet} size="xs" maxColumns={2} maxPerColumn={3} />
+                  <span className="felt-seat-bet-amt">{formatChips(myBet)}</span>
+                </span>
+              ) : null}
+            </div>
             <div
               ref={stackTargetRef}
               className={`felt-stack-target zone-felt-stack${me?.status === 'ALL_IN' ? ' is-allin' : ''}`}
@@ -938,12 +953,23 @@ function FeltSeatPill({
 
   // Beside the name: live bet chips, or a loud ALL-IN + amount badge.
   // Showdown seats show their result instead (below).
+  // Left rail: amount then chips (value reads toward the seat). Right: chips
+  // then amount — same visual grammar as avatar-on-the-outside.
   const marks = showdown ? null : player.status === 'ALL_IN' ? (
     <AllInBadge amount={player.betThisRound ?? 0} size="sm" />
   ) : player.betThisRound ? (
     <span className="felt-seat-bet-chip" aria-label={`Apuesta ${formatChips(player.betThisRound)}`}>
-      <ChipStackMini amount={player.betThisRound} size="xs" maxColumns={2} maxPerColumn={3} />
-      <span className="felt-seat-bet-amt">{formatChips(player.betThisRound)}</span>
+      {side === 'left' ? (
+        <>
+          <span className="felt-seat-bet-amt">{formatChips(player.betThisRound)}</span>
+          <ChipStackMini amount={player.betThisRound} size="xs" maxColumns={2} maxPerColumn={3} />
+        </>
+      ) : (
+        <>
+          <ChipStackMini amount={player.betThisRound} size="xs" maxColumns={2} maxPerColumn={3} />
+          <span className="felt-seat-bet-amt">{formatChips(player.betThisRound)}</span>
+        </>
+      )}
     </span>
   ) : null;
 

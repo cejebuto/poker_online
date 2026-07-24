@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import type { WsClientEvent } from '@poker/shared';
 import { hub } from './hub.js';
-import { handleClientEvent, onDisconnect } from './handlers.js';
+import { handleClientEvent, onDisconnect, sendPresence } from './handlers.js';
 
 function parseClientEvent(raw: string): WsClientEvent | null {
   try {
@@ -21,6 +21,8 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
   wss.on('connection', (socket) => {
     const connectionId = randomBytes(8).toString('hex');
     const session = hub.register(connectionId, socket);
+    // Let the gate/home screens show the live registered-user count immediately.
+    sendPresence(connectionId);
     void import('../observability/metrics.js').then(({ metrics }) => {
       metrics.wsConnections += 1;
     });

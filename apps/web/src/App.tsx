@@ -22,6 +22,7 @@ import {
   saveAutoNextHand,
 } from './features/autoNextHand';
 import { ThemeSettings } from './cards/ThemeSettings';
+import { RouletteScreen } from './roulette/RouletteScreen';
 
 type User = { displayName: string; avatar: string };
 
@@ -47,14 +48,21 @@ export function App() {
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [lastActionEvent, setLastActionEvent] = useState<SeatActionEvent | null>(null);
   const [pickedRoom, setPickedRoom] = useState<string | undefined>(undefined);
+  /** Registered users with a pseudonym (room optional). null = not yet received. */
+  const [activeUsers, setActiveUsers] = useState<number | null>(null);
   const actionSeqRef = useRef(0);
   const wsRef = useRef<WsHandle | null>(null);
+  const userRef = useRef<User | null>(null);
   const resumeAttempted = useRef(false);
   /** Prevents double auto-start for the same completed hand. */
   const autoNextTokenRef = useRef<string | null>(null);
   /** One-shot guard for invite-link / public-room auto-join. */
   const publicJoinAttemptedRef = useRef<string | null>(null);
   const prefill = useMemo(() => joinRoomIdFromPath(), []);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const openThemes = (from: Screen) => {
     setThemesReturn(from);
@@ -95,6 +103,9 @@ export function App() {
         setPlayerId(event.playerId);
         setRole(event.role);
         setScreen(event.role === 'mesa' ? 'table' : 'lobby');
+        break;
+      case 'presence:update':
+        setActiveUsers(event.count);
         break;
       case 'state:snapshot':
       case 'state:patch':
@@ -224,6 +235,11 @@ export function App() {
           handle.send({ type: 'session:resume', token: session.token });
         }
         handle.send({ type: 'rooms:list' });
+        // Re-register presence after reconnect (count is per live connection).
+        const u = userRef.current;
+        if (u) {
+          handle.send({ type: 'presence:hello', displayName: u.displayName });
+        }
       },
     });
     wsRef.current = handle;
@@ -315,8 +331,11 @@ export function App() {
       <main className="app app-gate">
         <UserGate
           status={status}
+          activeUsers={activeUsers}
           onReady={(u) => {
             setUser(u);
+            userRef.current = u;
+            wsRef.current?.send({ type: 'presence:hello', displayName: u.displayName });
             setScreen(prefill ? 'join' : 'home');
           }}
         />
@@ -383,7 +402,8 @@ export function App() {
   const onLobby = screen === 'lobby';
   const onJoin = screen === 'join' || screen === 'mesa-join';
   const onPlay = screen === 'play';
-  const feltShell = onHome || onCreate || onLobby || onJoin;
+  const onRoulette = screen === 'roulette';
+  const feltShell = onHome || onCreate || onLobby || onJoin || onRoulette;
 
   return (
     <main
@@ -400,7 +420,9 @@ export function App() {
                   ? 'app app-join'
                   : onPlay
                     ? 'app app-play'
-                    : 'app'
+                    : onRoulette
+                      ? 'app app-roulette'
+                      : 'app'
       }
     >
       {!feltShell ? (
@@ -417,6 +439,7 @@ export function App() {
         <Home
           status={status}
           displayName={user?.displayName ?? ''}
+          activeUsers={activeUsers}
           joinPrefill={prefill}
           onCreate={() => setScreen('create')}
           onJoin={() => setScreen('join')}
@@ -441,6 +464,13 @@ export function App() {
             });
           }}
           onOpenThemes={() => openThemes('home')}
+          onOpenRoulette={() => setScreen('roulette')}
+        />
+      )}
+      {screen === 'roulette' && user && (
+        <RouletteScreen
+          user={{ displayName: user.displayName, avatar: user.avatar }}
+          onExit={() => setScreen('home')}
         />
       )}
       {screen === 'themes' && (

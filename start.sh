@@ -104,6 +104,17 @@ wait_for_health() { # wait_for_health <compose_fn> <label>
       "fetch('http://127.0.0.1:3001/health').then(r=>r.text().then(t=>{console.log(t);process.exit(r.ok?0:1)})).catch(()=>process.exit(1))" \
       2>/dev/null; then
       log "API is healthy."
+      # Roulette is a second listener inside the same container (:3002). Fail loud
+      # if the package/build is fine but the process never bound the port.
+      if "$fn" exec -T api node -e \
+        "fetch('http://127.0.0.1:3002/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" \
+        2>/dev/null; then
+        log "Roulette is healthy (port 3002)."
+      else
+        warn "Roulette did not answer on :3002. Check api logs for [roulette]."
+        "$fn" logs --tail 40 api || true
+        exit 1
+      fi
       return 0
     fi
     sleep 3
@@ -146,11 +157,13 @@ REDIS_PORT=6380
 REDIS_URL=redis://localhost:6380
 
 API_PORT=3001
+# Roulette WS server (same api container). Local compose publishes it; prod keeps it internal.
+ROULETTE_PORT=3002
 JWT_SECRET=${jwt}
 WEB_ORIGIN=http://localhost:8088
 
 WEB_PORT=8088
-# Empty in docker: browser uses same-origin /ws via nginx proxy
+# Empty in docker: browser uses same-origin /ws and /roulette via nginx proxy
 VITE_WS_URL=
 EOF
   chmod 600 .env
@@ -218,6 +231,10 @@ JWT_SECRET=$(gen_secret 32)
 WEB_ORIGIN=${origin}
 SITE_ADDRESS=${site}
 
+# Poker WS + roulette WS stay internal; Caddy terminates wss:// on 443 and
+# proxies /ws → api:3001 and /roulette → api:3002. Do not publish 3001/3002.
+ROULETTE_PORT=3002
+
 HTTP_PORT=80
 HTTPS_PORT=443
 EOF
@@ -272,5 +289,7 @@ else
   echo "  Logs:    docker compose -f docker-compose.prod.yml --env-file .env.production logs -f"
   echo "  Stop:    ./start_prod.sh down   (or ./start.sh down)"
   echo "  Backup:  ./scripts/backup-postgres.sh"
+  echo "  Poker:   wss://<domain>/ws   (Caddy → api:3001)"
+  echo "  Roulette:wss://<domain>/roulette (Caddy → api:3002, internal only)"
   echo "  Note:    direct IP access returns 403 — use the domain only"
 fi

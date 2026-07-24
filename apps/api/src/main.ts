@@ -7,6 +7,7 @@ import { env } from './config/env.js';
 import { checkPostgres, prisma } from './persistence/prisma.js';
 import { checkRedis, redis } from './cache/redis.js';
 import { attachWebSocket } from './ws/gateway.js';
+import { startRoulette } from './roulette/rouletteGateway.js';
 import { hydrateRoomsFromSnapshots } from './domain/hydrate.js';
 import { roomPubSub } from './cache/roomPubSub.js';
 import { listHandHistory } from './persistence/eventStore.js';
@@ -55,6 +56,8 @@ async function bootstrap(): Promise<void> {
 
   const server = http.createServer(app);
   attachWebSocket(server);
+  // Separate, self-contained server on its own port — the poker is untouched.
+  startRoulette();
 
   const postgresUp = await checkPostgres();
   const redisUp = await checkRedis();

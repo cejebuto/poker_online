@@ -1,5 +1,6 @@
 import { useId, useState, type FormEvent, type KeyboardEvent } from 'react';
 import type { ConnectionStatus } from '../net/wsClient';
+import { ActiveUsersBadge } from './ActiveUsersBadge';
 import { DisclaimerModal } from './DisclaimerModal';
 import { SEAT_CHIPS, SeatChip, seatChipByToken } from './SeatChip';
 
@@ -11,9 +12,12 @@ const CONN_LABEL: Record<ConnectionStatus, string> = {
 
 export function UserGate({
   status,
+  activeUsers,
   onReady,
 }: {
   status: ConnectionStatus;
+  /** Registered users online (null while unknown). */
+  activeUsers?: number | null;
   onReady: (user: { displayName: string; avatar: string }) => void;
 }) {
   const nameId = useId();
@@ -51,7 +55,10 @@ export function UserGate({
           <span className={`dot ${status}`} aria-hidden />
           {CONN_LABEL[status]}
         </div>
-        <p className="gate-brand">MESA · TEXAS HOLD&apos;EM</p>
+        <div className="gate-top-right">
+          <ActiveUsersBadge count={activeUsers ?? null} />
+          <p className="gate-brand">MESA · TEXAS HOLD&apos;EM</p>
+        </div>
       </header>
 
       <form className="gate-card" onSubmit={onSubmit}>

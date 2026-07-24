@@ -13,6 +13,7 @@
   "dependencies": {
     "@poker/engine": "workspace:*",
     "@poker/shared": "workspace:*",
+    "@roulette/core": "workspace:*",
     "@use-gesture/react": "^10.3.1",
     "motion": "^12.42.2",
     "qrcode": "^1.5.4",

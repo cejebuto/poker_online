@@ -22,7 +22,9 @@
       "@poker/engine": ["packages/engine/src/index.ts"],
       "@poker/engine/*": ["packages/engine/src/*"],
       "@poker/shared": ["packages/shared/src/index.ts"],
-      "@poker/shared/*": ["packages/shared/src/*"]
+      "@poker/shared/*": ["packages/shared/src/*"],
+      "@roulette/core": ["packages/roulette/src/index.ts"],
+      "@roulette/core/*": ["packages/roulette/src/*"]
     }
   }
 }

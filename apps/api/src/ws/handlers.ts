@@ -1,4 +1,5 @@
 import type { WsClientEvent, WsServerEvent } from '@poker/shared';
+import { sanitizeDisplayName } from '@poker/shared';
 import type { ActionType } from '@poker/engine';
 import { verifySession } from '../auth/jwt.js';
 import { roomLocks } from '../domain/lock.js';
@@ -27,6 +28,16 @@ import { hub } from './hub.js';
 
 function error(code: string, message: string): WsServerEvent {
   return { type: 'error', code, message };
+}
+
+/** Current registered-user total to every open socket. */
+export function broadcastPresence(): void {
+  hub.broadcastAll({ type: 'presence:update', count: hub.countPresent() });
+}
+
+/** Snapshot for a single connection (e.g. right after connect). */
+export function sendPresence(connectionId: string): void {
+  hub.send(connectionId, { type: 'presence:update', count: hub.countPresent() });
 }
 
 function snapshotFor(roomId: string, playerId: string | null): WsServerEvent | null {
@@ -75,6 +86,29 @@ export async function handleClientEvent(
           rooms: listActiveRooms(),
         });
         return;
+
+      case 'presence:hello': {
+        const rl = rateLimit(`${session.connectionId}:presence`, 10, 60_000);
+        if (!rl.ok) {
+          hub.send(session.connectionId, {
+            type: 'error',
+            code: 'RATE_LIMIT',
+            message: 'Too many presence updates',
+          });
+          return;
+        }
+        const raw = (event.displayName ?? '').trim();
+        if (raw.length < 2) {
+          hub.send(session.connectionId, error('INVALID_USER', 'displayName required'));
+          return;
+        }
+        const wasPresent = Boolean(session.displayName);
+        session.displayName = sanitizeDisplayName(raw);
+        // Re-hello only renames; count changes when a new registration appears.
+        if (!wasPresent) broadcastPresence();
+        else hub.send(session.connectionId, { type: 'presence:update', count: hub.countPresent() });
+        return;
+      }
 
       case 'session:resume': {
         const claims = verifySession(event.token);
@@ -501,5 +535,7 @@ export function onDisconnect(session: ClientSession): void {
     scheduleDisconnectWatch(roomId, playerId);
     broadcastSnapshots(roomId);
   }
+  const wasPresent = Boolean(session.displayName);
   hub.remove(session.connectionId);
+  if (wasPresent) broadcastPresence();
 }

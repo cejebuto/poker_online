@@ -16,6 +16,7 @@
   "dependencies": {
     "@poker/engine": "workspace:*",
     "@poker/shared": "workspace:*",
+    "@roulette/core": "workspace:*",
     "@prisma/client": "^6.8.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

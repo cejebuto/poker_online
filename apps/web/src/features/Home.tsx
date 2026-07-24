@@ -1,5 +1,6 @@
 import type { RoomSummary } from '@poker/shared';
 import type { ConnectionStatus } from '../net/wsClient';
+import { ActiveUsersBadge } from './ActiveUsersBadge';
 import { RoomBrowser } from './RoomBrowser';
 
 const CONN_LABEL: Record<ConnectionStatus, string> = {
@@ -11,6 +12,7 @@ const CONN_LABEL: Record<ConnectionStatus, string> = {
 export function Home({
   status,
   displayName,
+  activeUsers,
   onCreate,
   onJoin,
   onMesa,
@@ -20,9 +22,12 @@ export function Home({
   onRefreshRooms,
   onDeleteRoom,
   onOpenThemes,
+  onOpenRoulette,
 }: {
   status: ConnectionStatus;
   displayName: string;
+  /** Registered users online (null while unknown). */
+  activeUsers?: number | null;
   onCreate: () => void;
   onJoin: () => void;
   onMesa: () => void;
@@ -32,6 +37,7 @@ export function Home({
   onRefreshRooms: () => void;
   onDeleteRoom?: (room: RoomSummary) => void;
   onOpenThemes?: () => void;
+  onOpenRoulette?: () => void;
 }) {
   return (
     <div className="home">
@@ -40,13 +46,28 @@ export function Home({
           <span className={`dot ${status}`} aria-hidden />
           {CONN_LABEL[status]}
         </div>
-        <p className="home-brand">TEXAS HOLD&apos;EM · NO-LIMIT</p>
+        <div className="home-top-right">
+          <ActiveUsersBadge count={activeUsers ?? null} />
+          <p className="home-brand">TEXAS HOLD&apos;EM · NO-LIMIT</p>
+        </div>
       </header>
 
       <section className="home-card home-hero" aria-labelledby="home-title">
-        <h1 id="home-title" className="home-title">
-          Póker con amigos
-        </h1>
+        <div className="home-title-row">
+          <h1 id="home-title" className="home-title">
+            Póker con amigos
+          </h1>
+          {onOpenRoulette ? (
+            <button
+              type="button"
+              className="home-roulette-btn"
+              onClick={onOpenRoulette}
+              aria-label="Abrir la ruleta"
+            >
+              🎡 Ruleta
+            </button>
+          ) : null}
+        </div>
         <p className="home-sub">Salas privadas · una mano entre conocidos</p>
         {joinPrefill ? (
           <p className="home-invite">Invitación a sala: {joinPrefill}</p>

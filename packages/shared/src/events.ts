@@ -24,6 +24,11 @@ export type WsClientEvent =
   | { type: 'ping'; requestId?: string }
   /** Ask for the public directory of joinable tables. No session required. */
   | { type: 'rooms:list' }
+  /**
+   * Mark this connection as a registered app user (chose a pseudonym).
+   * Counts toward the global “active users” total even outside a poker room.
+   */
+  | { type: 'presence:hello'; displayName: string }
   | { type: 'session:resume'; token: string }
   | {
       type: 'room:create';
@@ -72,6 +77,11 @@ export type WsClientEvent =
 export type WsServerEvent =
   | { type: 'pong'; requestId?: string; ts: number }
   | { type: 'rooms:listed'; rooms: RoomSummary[] }
+  /**
+   * How many WebSocket clients have registered a pseudonym (in a room or not).
+   * Sent on connect and whenever the count changes.
+   */
+  | { type: 'presence:update'; count: number }
   /** Ack after a successful `room:delete` — clients refresh the directory. */
   | { type: 'room:deleted'; roomId: string }
   | { type: 'error'; code: string; message: string }

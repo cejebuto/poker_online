@@ -7,7 +7,8 @@ export type Screen =
   | 'lobby'
   | 'play'
   | 'table'
-  | 'themes';
+  | 'themes'
+  | 'roulette';
 
 export type BackAction = {
   label: string;
@@ -21,8 +22,10 @@ export type BackAction = {
  */
 export function backFor(screen: Screen): BackAction | null {
   switch (screen) {
+    // 'roulette' is full-bleed and carries its own back control.
     case 'user':
     case 'home':
+    case 'roulette':
       return null;
     case 'create':
     case 'join':

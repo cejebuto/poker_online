@@ -41,6 +41,8 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 3001
+      # Second WS server in-process; Caddy maps /roulette → this port. Not published on the host.
+      ROULETTE_PORT: ${ROULETTE_PORT:-3002}
       LOG_LEVEL: info
       DATABASE_URL: postgresql://${POSTGRES_USER:-poker}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-poker}
       REDIS_URL: redis://redis:6379
@@ -51,9 +53,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Internal only — Caddy reaches these on the poker network. Never map to host ports in prod.
     expose:
       - "3001"
+      - "3002"
     networks: [poker]
+    # Poker rooms scale via Redis pub/sub. Roulette is in-memory — keep api replicas at 1
+    # until sticky routing exists for /roulette.
     # scale: docker compose -f docker-compose.prod.yml up --scale api=2
 
   web:
